@@ -1,7 +1,9 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:hamkeitda_flutter/core/dio_provider.dart';
 import 'package:hamkeitda_flutter/core/lib.dart';
+import 'package:hamkeitda_flutter/features/counsel/domain/counsel_request.dart';
 import 'package:hamkeitda_flutter/features/facility/domain/fee_info.dart';
 import 'package:hamkeitda_flutter/features/facility/domain/post_info.dart';
 import 'package:hamkeitda_flutter/features/facility/domain/program_info.dart';
@@ -50,24 +52,32 @@ class FacilityDetailController
   }
 
   Future<void> submitConsult({
-    required String name,
-    required String phone,
-    required String message,
+    required CounselRequest req,
   }) async {
     if (_id == null) return;
 
-    if (USE_MOCK) return; // 목업 모드는 성공 처리로 끝
+    // MOCK 모드면 그냥 성공 처리
+    if (USE_MOCK) {
+      debugPrint('[MOCK] 상담 신청: ${req.toJson()}');
+      return;
+    }
 
     try {
       final dio = ref.read(dioProvider);
+
+      // 백엔드: POST /api/facility/{id}/counsel
       await dio.post(
-        '/api/facility/$_id/consult',
-        data: {'name': name, 'phone': phone, 'message': message},
+        '/api/facility/$_id/counsel',
+        data: req.toJson(),
       );
+
+      debugPrint('상담 신청 성공');
     } on DioException catch (e) {
-      // 실패해도 UI는 계속 쓸 수 있도록 예외만 로그
-      // ignore: avoid_print
-      print('상담 신청 오류: ${e.message}');
+      debugPrint('상담 신청 오류: ${e.response?.statusCode} ${e.message}');
+      rethrow; // 화면 쪽에서 스낵바 띄우고 싶으면 rethrow 하는 것도 가능
+    } catch (e) {
+      debugPrint('상담 신청 알 수 없는 오류: $e');
+      rethrow;
     }
   }
 

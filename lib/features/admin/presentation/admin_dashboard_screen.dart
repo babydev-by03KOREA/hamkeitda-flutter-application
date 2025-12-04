@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hamkeitda_flutter/features/admin/application/admin_controller.dart';
+import 'package:hamkeitda_flutter/features/admin/presentation/counsel_readonly_sheet.dart';
 import 'package:hamkeitda_flutter/features/auth/application/auth_provider.dart';
+import 'package:hamkeitda_flutter/features/counsel/domain/counsel_detail.dart';
+import 'package:hamkeitda_flutter/features/counsel/domain/counsel_form_state.dart';
 
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
@@ -16,7 +19,13 @@ class AdminDashboardScreen extends ConsumerWidget {
         title: const Text('복지시설 관리자 대시보드'),
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const AdminCounselListScreen(),
+                ),
+              );
+            },
             icon: const Icon(Icons.notifications_none),
           ),
           TextButton.icon(

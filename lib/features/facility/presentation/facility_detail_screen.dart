@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hamkeitda_flutter/features/counsel/presentation/counsel_form_screen.dart';
 import 'package:hamkeitda_flutter/features/facility/application/facility_detail_controller.dart';
 import 'package:hamkeitda_flutter/features/facility/domain/facility_detail.dart';
 import 'package:hamkeitda_flutter/features/facility/domain/fee_info.dart';
@@ -85,75 +86,13 @@ class _FacilityDetailScreenState extends ConsumerState<FacilityDetailScreen>
       ),
       floatingActionButton: state.hasValue
           ? FloatingActionButton.extended(
-              onPressed: () => _openConsultSheet(context),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const CounselFormScreen()),
+              ),
               icon: const Icon(Icons.sms_outlined),
               label: const Text('상담 신청'),
             )
           : null,
-    );
-  }
-
-  void _openConsultSheet(BuildContext context) {
-    final name = TextEditingController();
-    final phone = TextEditingController();
-    final msg = TextEditingController();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                '상담 신청',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: name,
-                decoration: const InputDecoration(hintText: '이름'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: phone,
-                decoration: const InputDecoration(hintText: '연락처'),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: msg,
-                decoration: const InputDecoration(hintText: '내용'),
-                maxLines: 4,
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () async {
-                  await ref
-                      .read(facilityDetailControllerProvider.notifier)
-                      .submitConsult(
-                        name: name.text.trim(),
-                        phone: phone.text.trim(),
-                        message: msg.text.trim(),
-                      );
-                  if (mounted) {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('상담 신청이 접수되었습니다.')),
-                    );
-                  }
-                },
-                child: const Text('신청하기'),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -322,11 +261,14 @@ class _Tabs extends StatelessWidget {
         ),
         child: TabBar(
           controller: controller,
-          isScrollable: false, // 1. 스크롤 비활성화 (탭 크기 균등 배분)
-          indicatorPadding: const EdgeInsets.all(4), // 2. (추천) 인디케이터에 여백 추가
+          isScrollable: false,
+          // 1. 스크롤 비활성화 (탭 크기 균등 배분)
+          indicatorPadding: const EdgeInsets.all(4),
+          // 2. (추천) 인디케이터에 여백 추가
           indicator: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(24), // 3. 여백에 맞게 값 조절 (20~24 추천)
+            borderRadius: BorderRadius.circular(24),
+            // 3. 여백에 맞게 값 조절 (20~24 추천)
             boxShadow: [
               BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6),
             ],
