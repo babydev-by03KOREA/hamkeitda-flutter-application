@@ -5,7 +5,7 @@ class CounselDetail {
   final int facilityId;
   final String applicantName;
   final String applicantPhone;
-  final DateTime createdAt;
+  final DateTime? createdAt;
 
   /// 서버에 저장된 상담 신청서 (JSON String → Map)
   final Map<String, dynamic> answersJson;
@@ -25,7 +25,9 @@ class CounselDetail {
       facilityId: json['facilityId'],
       applicantName: json['applicantName'],
       applicantPhone: json['applicantPhone'] ?? '',
-      createdAt: DateTime.parse(json['createdAt']),
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'])
+          : null,
       answersJson: json['answersJson'] is String
           ? jsonDecode(json['answersJson'])
           : (json['answersJson'] as Map).cast<String, dynamic>(),
