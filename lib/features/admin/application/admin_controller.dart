@@ -1,85 +1,63 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hamkeitda_flutter/core/dio_provider.dart';
 import 'package:hamkeitda_flutter/features/admin/data/admin_api.dart';
-import 'package:hamkeitda_flutter/features/auth/application/auth_provider.dart';
+import 'package:hamkeitda_flutter/features/admin/data/admin_repository.dart';
+import 'package:hamkeitda_flutter/features/admin/domain/admin_basic_state.dart';
+import '../../auth/application/auth_provider.dart';
 
-@immutable
-class AdminBasicState {
-  final String name, openHours, phone, address, description;
-  final String? imageUrl;
+final adminApiProvider = Provider<AdminApi>((ref) {
+  final dio = ref.read(dioProvider);
+  return AdminApi(dio: dio);
+});
 
-  const AdminBasicState({
-    this.name = '',
-    this.openHours = '',
-    this.phone = '',
-    this.address = '',
-    this.description = '',
-    this.imageUrl,
-  });
-
-  AdminBasicState copyWith({
-    String? name,
-    String? openHours,
-    String? phone,
-    String? address,
-    String? description,
-    String? imageUrl,
-  }) => AdminBasicState(
-    name: name ?? this.name,
-    openHours: openHours ?? this.openHours,
-    phone: phone ?? this.phone,
-    address: address ?? this.address,
-    description: description ?? this.description,
-    imageUrl: imageUrl ?? this.imageUrl,
-  );
-}
+final adminRepositoryProvider = Provider<AdminRepository>((ref) {
+  return AdminRepository(ref.read(adminApiProvider));
+});
 
 final adminBasicProvider =
-    StateNotifierProvider<AdminBasicController, AsyncValue<AdminBasicState>>((
-      ref,
-    ) {
-      return AdminBasicController(ref);
-    });
+    AsyncNotifierProvider<AdminBasicController, AdminBasicState>(
+      AdminBasicController.new,
+    );
 
-class AdminBasicController extends StateNotifier<AsyncValue<AdminBasicState>> {
-  final Ref ref;
+class AdminBasicController extends AsyncNotifier<AdminBasicState> {
+  @override
+  Future<AdminBasicState> build() async {
+    final user = ref.watch(currentUserProvider);
 
-  AdminBasicController(this.ref) : super(const AsyncLoading()) {
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final user = ref.read(currentUserProvider);
-      final api = ref.read(adminApiProvider);
-      final fid = user?.facilityId ?? 'f-admin';
-      final data = await api.getFacilityForAdmin(fid as String?);
-      state = AsyncData(
-        AdminBasicState(
-          name: data['name'] ?? '',
-          openHours: data['openHours'] ?? '',
-          phone: data['phone'] ?? '',
-          address: data['address'] ?? '',
-          description: data['description'] ?? '',
-          imageUrl: data['imageUrl'],
-        ),
+    final fid = user?.facilityId;
+    if (fid == null) {
+      // 시설 등록 전이면 Empty Form
+      return const AdminBasicState(
+        name: '',
+        openHours: '',
+        phone: '',
+        address: '',
+        description: '',
+        imageUrl: null,
       );
-    } catch (e, st) {
-      state = AsyncError(e, st);
     }
+
+    final repo = ref.read(adminRepositoryProvider);
+    return repo.getBasic(fid);
   }
 
   Future<void> save(AdminBasicState s) async {
-    final user = ref.read(currentUserProvider);
-    final fid = user?.facilityId ?? 'f-admin';
-    await ref.read(adminApiProvider).updateBasic(fid as String?, {
-      'name': s.name,
-      'openHours': s.openHours,
-      'phone': s.phone,
-      'address': s.address,
-      'description': s.description,
-      'imageUrl': s.imageUrl,
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final user = ref.read(currentUserProvider);
+      final repo = ref.read(adminRepositoryProvider);
+
+      final fid = user?.facilityId;
+      if (fid == null) {
+        // 아직 facilityId가 없으면 "생성" API로
+        await repo.saveBasic(s);
+      } else {
+        // 있으면 "수정"
+        await repo.updateBasic(fid, s);
+      }
+
+      // 저장 후 화면 갱신
+      return s;
     });
-    state = AsyncData(s);
   }
 }

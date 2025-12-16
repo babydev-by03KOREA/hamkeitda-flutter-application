@@ -8,6 +8,7 @@ import 'package:hamkeitda_flutter/features/facility/presentation/facility_detail
 import 'core/theme.dart';
 import 'features/auth/application/auth_provider.dart';
 import 'features/auth/presentation/auth_screen.dart';
+
 // 1. IMPORT YOUR REAL CONTROLLER
 import 'features/auth/application/auth_controller.dart';
 import 'features/auth/presentation/service_type_screen.dart';
@@ -49,8 +50,7 @@ class App extends ConsumerWidget {
         final user = authState.valueOrNull;
 
         if (user != null) {
-          if (user.role == UserRole.superAdmin ||
-              user.role == UserRole.facilityAdmin) {
+          if (user.role == UserRole.facility) {
             return const AdminDashboardScreen();
           }
           return const FacilityMapScreen();
@@ -59,6 +59,7 @@ class App extends ConsumerWidget {
         return const ServiceTypeScreen();
       }(),
       routes: {
+        ServiceTypeScreen.route: (_) => const ServiceTypeScreen(),
         AuthScreen.route: (_) => const AuthScreen(),
         FacilityMapScreen.route: (_) => const FacilityMapScreen(),
         FacilityDetailScreen.route: (ctx) {
@@ -66,7 +67,7 @@ class App extends ConsumerWidget {
           return FacilityDetailScreen(id: id);
         },
         AdminGuard.route: (ctx) =>
-        const AdminGuard(child: AdminDashboardScreen()),
+            const AdminGuard(child: AdminDashboardScreen()),
       },
     );
   }

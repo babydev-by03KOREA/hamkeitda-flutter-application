@@ -6,6 +6,8 @@ enum ServiceType { personal, facility, guest }
 final serviceTypeProvider = StateProvider<ServiceType>((ref) => ServiceType.personal);
 
 class ServiceTypeScreen extends ConsumerWidget {
+  static const route = '/service-type';
+
   const ServiceTypeScreen({super.key});
 
   @override
@@ -99,11 +101,11 @@ class _ChoiceCard extends ConsumerWidget {
           switch (routeTap) {
             case 'personal':
               ref.read(serviceTypeProvider.notifier).state = ServiceType.personal;
-              Navigator.of(context).pushNamed('/auth', arguments: {'title': '개인회원', 'icon': Icons.person},);
+              Navigator.of(context).pushNamed('/auth', arguments: {'title': '개인회원', 'type': 'personal', 'icon': Icons.person},);
               break;
             case 'facility':
               ref.read(serviceTypeProvider.notifier).state = ServiceType.facility;
-              Navigator.of(context).pushNamed('/auth', arguments: {'title': '복지시설', 'icon': Icons.apartment},);
+              Navigator.of(context).pushNamed('/auth', arguments: {'title': '복지시설', 'type': 'facility','icon': Icons.apartment},);
               break;
             default:
               ref.read(serviceTypeProvider.notifier).state = ServiceType.guest;

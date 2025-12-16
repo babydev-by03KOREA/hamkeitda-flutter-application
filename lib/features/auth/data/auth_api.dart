@@ -36,7 +36,7 @@ class AuthApi {
     required String nickname,
     required String email,
     required String password,
-    required String role
+    required String role,
   }) async {
     try {
       final res = await _dio.post(
@@ -52,7 +52,7 @@ class AuthApi {
 
       debugPrint('✅ JOIN OK: ${res.requestOptions.uri}');
       debugPrint('✅ BODY: ${res.data}');
-      return (res.data as Map<String, dynamic>)['data']['user'];
+      return (res.data as Map).cast<String, dynamic>();
     } on DioException catch (e) {
       debugPrint('❌ JOIN FAIL: ${e.requestOptions.uri}');
       debugPrint('❌ STATUS: ${e.response?.statusCode}');

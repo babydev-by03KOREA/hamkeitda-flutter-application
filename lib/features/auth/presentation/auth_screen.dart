@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hamkeitda_flutter/features/admin/presentation/admin_dashboard_screen.dart';
 import 'package:hamkeitda_flutter/features/auth/domain/user.dart';
+import 'package:hamkeitda_flutter/features/facility/presentation/facility_map_screen.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../../core/validators.dart';
 
@@ -41,7 +43,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       final user = next.valueOrNull;
       if (user != null) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const _AuthSuccess()),
+          MaterialPageRoute(
+            builder: (_) {
+              if (user.role == UserRole.facility) {
+                return const AdminDashboardScreen();
+              }
+              return const FacilityMapScreen();
+            },
+          ),
         );
       }
     });
@@ -52,7 +61,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     final auth = ref.watch(authControllerProvider);
 
     final args = ModalRoute.of(context)!.settings.arguments as Map?;
-    final title = args?['title'] ?? '기본 타이틀';
+    final title = args?['title'] ?? '로그인';
+    final type = args?['type'] ?? 'personal';
     final IconData icon = args?['icon'] ?? Icons.person;
 
     return Scaffold(
@@ -104,7 +114,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     if (tab == 0)
                       _LoginForm(isLoading: auth.isLoading)
                     else
-                      _SignupForm(isLoading: auth.isLoading, type: title),
+                      _SignupForm(
+                        isLoading: auth.isLoading,
+                        type: type,
+                        goToLoginTab: () => setState(() => tab = 0),
+                      ),
                   ],
                 ),
               ),
@@ -114,14 +128,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       ),
     );
   }
-}
-
-class _AuthSuccess extends StatelessWidget {
-  const _AuthSuccess();
-
-  @override
-  Widget build(BuildContext context) =>
-      const Scaffold(body: Center(child: Text('로그인 성공! (라우팅만 예시)')));
 }
 
 class _Segmented extends StatelessWidget {
@@ -265,8 +271,14 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
 class _SignupForm extends ConsumerStatefulWidget {
   final bool isLoading;
   final String type;
+  final VoidCallback goToLoginTab;
 
-  const _SignupForm({required this.isLoading, required this.type});
+  const _SignupForm({
+    super.key,
+    required this.isLoading,
+    required this.type,
+    required this.goToLoginTab,
+  });
 
   @override
   ConsumerState<_SignupForm> createState() => _SignupFormState();
@@ -296,8 +308,10 @@ class _SignupFormState extends ConsumerState<_SignupForm> {
         return 'ROLE_FACILITY';
       case 'personal':
         return 'ROLE_USER';
+      case 'guest':
+        throw Exception('게스트는 회원가입 없이 이용할 수 있어요.');
       default:
-        return 'ROLE_GUEST';
+        throw Exception('가입 타입이 올바르지 않아요.');
     }
   }
 
@@ -355,16 +369,35 @@ class _SignupFormState extends ConsumerState<_SignupForm> {
           ElevatedButton(
             onPressed: widget.isLoading
                 ? null
-                : () {
+                : () async {
                     if (_formKey.currentState!.validate()) {
-                      ref
-                          .read(authControllerProvider.notifier)
-                          .signup(
-                            nickname: _name.text.trim(),
-                            email: _email.text.trim(),
-                            password: _password.text,
-                            role: _roleFromType(widget.type),
-                          );
+                      try {
+                        final res = await ref
+                            .read(authRepositoryProvider)
+                            .signup(
+                              _name.text.trim(),
+                              _email.text.trim(),
+                              _password.text,
+                              _roleFromType(widget.type),
+                            );
+
+                        if (!context.mounted) return;
+
+                        ScaffoldMessenger.of(
+                          context,
+                        ).showSnackBar(SnackBar(content: Text(res.message)));
+
+                        widget.goToLoginTab();
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              e.toString().replaceFirst('Exception: ', ''),
+                            ),
+                          ),
+                        );
+                      }
                     }
                   },
             child: widget.isLoading

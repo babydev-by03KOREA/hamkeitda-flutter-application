@@ -6,6 +6,7 @@ import 'package:hamkeitda_flutter/features/auth/domain/user.dart' show UserRole;
 class AdminGuard extends ConsumerWidget {
   static const route = '/admin';
   final Widget child;
+
   const AdminGuard({super.key, required this.child});
 
   @override
@@ -16,7 +17,7 @@ class AdminGuard extends ConsumerWidget {
       Future.microtask(() => Navigator.pushReplacementNamed(context, '/auth'));
       return const SizedBox.shrink();
     }
-    if (user.role != UserRole.facilityAdmin && user.role != UserRole.superAdmin) {
+    if (user.role != UserRole.facility) {
       // 권한 없음
       return const Scaffold(
         body: Center(child: Text('접근 권한이 없습니다. 관리자에게 문의하세요.')),

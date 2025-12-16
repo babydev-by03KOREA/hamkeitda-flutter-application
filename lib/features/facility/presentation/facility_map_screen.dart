@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:hamkeitda_flutter/features/auth/application/auth_controller.dart';
+import 'package:hamkeitda_flutter/features/auth/domain/user.dart';
 import 'package:hamkeitda_flutter/features/facility/presentation/facility_detail_screen.dart';
 import '../../auth/presentation/service_type_screen.dart';
 import '../application/facility_controller.dart';
@@ -26,12 +28,48 @@ class _FacilityMapScreenState extends ConsumerState<FacilityMapScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(mode == ServiceType.guest ? '안녕하세요, 게스트님!' : '시설 위치'),
+        title: Consumer(
+          builder: (context, ref, _) {
+            final auth = ref.watch(authControllerProvider);
+            final user = auth.valueOrNull;
+
+            return Text(
+              user == null || user.role == UserRole.guest
+                  ? '안녕하세요, 게스트님!'
+                  : '시설 위치',
+            );
+          },
+        ),
         actions: [
-          TextButton.icon(
-            onPressed: () => Navigator.of(context).pushNamed('/auth'),
-            icon: const Icon(Icons.login),
-            label: const Text('로그인'),
+          Consumer(
+            builder: (context, ref, _) {
+              final auth = ref.watch(authControllerProvider);
+              final user = auth.valueOrNull;
+
+              // Guest: 로그인
+              if (user == null || user.role == UserRole.guest) {
+                return TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pushNamed('/auth');
+                  },
+                  icon: const Icon(Icons.login),
+                  label: const Text('로그인'),
+                );
+              }
+
+              // 로그인 상태: 로그아웃
+              return TextButton.icon(
+                onPressed: () async {
+                  await ref.read(authControllerProvider.notifier).signOut();
+
+                  Navigator.of(
+                    context,
+                  ).pushNamedAndRemoveUntil('/service-type', (route) => false);
+                },
+                icon: const Icon(Icons.logout),
+                label: const Text('로그아웃'),
+              );
+            },
           ),
         ],
       ),
@@ -125,7 +163,6 @@ class _MapAndList extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('시설 위치', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
         ClipRRect(
           borderRadius: BorderRadius.circular(20),

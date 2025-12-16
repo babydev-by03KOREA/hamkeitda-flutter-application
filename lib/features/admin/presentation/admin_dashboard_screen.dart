@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hamkeitda_flutter/features/admin/application/admin_controller.dart';
+import 'package:hamkeitda_flutter/features/admin/domain/admin_basic_state.dart';
 import 'package:hamkeitda_flutter/features/admin/presentation/admin_counsel_list_screen.dart';
 import 'package:hamkeitda_flutter/features/admin/presentation/counsel_readonly_sheet.dart';
 import 'package:hamkeitda_flutter/features/auth/application/auth_provider.dart';
+import 'package:hamkeitda_flutter/features/auth/domain/user.dart';
 import 'package:hamkeitda_flutter/features/counsel/domain/counsel_detail.dart';
 import 'package:hamkeitda_flutter/features/counsel/domain/counsel_form_state.dart';
+
+import '../../auth/application/auth_controller.dart';
 
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
@@ -17,22 +21,37 @@ class AdminDashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('복지시설 관리자 대시보드'),
+        title: const Text('복지시설 관리자'),
         actions: [
-          IconButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const AdminCounselListScreen(),
-                ),
+          Consumer(
+            builder: (context, ref, _) {
+              final auth = ref.watch(authControllerProvider);
+              final user = auth.valueOrNull;
+
+              // Guest: 로그인
+              if (user == null || user.role == UserRole.guest) {
+                return TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pushNamed('/auth');
+                  },
+                  icon: const Icon(Icons.login),
+                  label: const Text('로그인'),
+                );
+              }
+
+              // 로그인 상태: 로그아웃
+              return TextButton.icon(
+                onPressed: () async {
+                  await ref.read(authControllerProvider.notifier).signOut();
+
+                  Navigator.of(
+                    context,
+                  ).pushNamedAndRemoveUntil('/service-type', (route) => false);
+                },
+                icon: const Icon(Icons.logout),
+                label: const Text('로그아웃'),
               );
             },
-            icon: const Icon(Icons.notifications_none),
-          ),
-          TextButton.icon(
-            onPressed: () => Navigator.pushNamed(context, '/auth'),
-            icon: const Icon(Icons.logout),
-            label: const Text('로그아웃'),
           ),
         ],
         bottom: PreferredSize(
@@ -97,7 +116,7 @@ class _AdminBodyState extends ConsumerState<_AdminBody>
     with TickerProviderStateMixin {
   late final TabController _tab;
   late AdminBasicState _s = widget.state;
-  int _currentTabIndex = 0; // [추가] 현재 탭 인덱스 추적
+  int _currentTabIndex = 0;
 
   @override
   void initState() {
@@ -113,6 +132,36 @@ class _AdminBodyState extends ConsumerState<_AdminBody>
         });
       }
     });
+
+    ref.listen<AsyncValue<AdminBasicState>>(adminBasicProvider, (prev, next) {
+      if (!mounted) return;
+
+      // 에러
+      if (next.hasError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              next.error.toString().replaceFirst('Exception: ', ''),
+            ),
+          ),
+        );
+      }
+
+      // 저장 성공: prev가 loading이고 next가 data로 돌아왔을 때만
+      final wasLoading = prev?.isLoading ?? false;
+      final isData = next.hasValue;
+      if (wasLoading && isData) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('저장 완료!')));
+      }
+    });
+
+    _tab.addListener(() {
+      if (_tab.indexIsChanging) {
+        setState(() => _currentTabIndex = _tab.index);
+      }
+    });
   }
 
   @override
@@ -123,6 +172,9 @@ class _AdminBodyState extends ConsumerState<_AdminBody>
 
   @override
   Widget build(BuildContext context) {
+    final basicAsync = ref.watch(adminBasicProvider);
+    final isSaving = basicAsync.isLoading;
+
     // [수정] ListView의 패딩을 수정하여 하단 버튼 영역을 침범하지 않도록 함
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 80), // 하단 패딩 추가
@@ -181,8 +233,11 @@ class _AdminBodyState extends ConsumerState<_AdminBody>
                       height: 100,
                       color: const Color(0xFFEFEFEF),
                       child: _s.imageUrl == null
-                          ? const Icon(Icons.image_not_supported_outlined,
-                          size: 40, color: Colors.black26)
+                          ? const Icon(
+                              Icons.image_not_supported_outlined,
+                              size: 40,
+                              color: Colors.black26,
+                            )
                           : Image.network(_s.imageUrl!, fit: BoxFit.cover),
                     ),
                   ),
@@ -210,7 +265,7 @@ class _AdminBodyState extends ConsumerState<_AdminBody>
                 child: FilledButton(
                   onPressed: () =>
                       ref.read(adminBasicProvider.notifier).save(_s),
-                  child: const Text('저장'),
+                  child: isSaving ? const Text('저장 중...') : const Text('저장'),
                 ),
               ),
             ],
@@ -250,11 +305,14 @@ class _Tabs extends StatelessWidget {
         ),
         child: TabBar(
           controller: controller,
-          isScrollable: false, // 1. 스크롤 비활성화 (탭 크기 균등 배분)
-          indicatorPadding: const EdgeInsets.all(4), // 2. (추천) 인디케이터에 여백 추가
+          isScrollable: false,
+          // 1. 스크롤 비활성화 (탭 크기 균등 배분)
+          indicatorPadding: const EdgeInsets.all(4),
+          // 2. (추천) 인디케이터에 여백 추가
           indicator: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(24), // 3. 여백에 맞게 값 조절 (20~24 추천)
+            borderRadius: BorderRadius.circular(24),
+            // 3. 여백에 맞게 값 조절 (20~24 추천)
             boxShadow: [
               BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6),
             ],
@@ -330,6 +388,7 @@ class _TextField extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 10),
     child: TextField(
+      key: ValueKey(label),
       controller: TextEditingController(text: initial),
       maxLines: maxLines,
       onChanged: onChanged,
@@ -359,13 +418,9 @@ class _TabRequiredDocs extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
-                child: _TabInputTextField(hint: '서류명을 입력하세요'),
-              ),
+              const Expanded(child: _TabInputTextField(hint: '서류명을 입력하세요')),
               const SizedBox(width: 8),
-              const Expanded(
-                child: _TabInputTextField(hint: '획득 방법 (선택사항)'),
-              ),
+              const Expanded(child: _TabInputTextField(hint: '획득 방법 (선택사항)')),
               const SizedBox(width: 8),
               _AddButton(onPressed: () {}),
             ],
@@ -394,13 +449,9 @@ class _TabPrograms extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
-                child: _TabInputTextField(hint: '프로그램명을 입력하세요'),
-              ),
+              const Expanded(child: _TabInputTextField(hint: '프로그램명을 입력하세요')),
               const SizedBox(width: 8),
-              const Expanded(
-                child: _TabInputTextField(hint: '프로그램 설명 (선택.)'),
-              ),
+              const Expanded(child: _TabInputTextField(hint: '프로그램 설명 (선택.)')),
               const SizedBox(width: 8),
               _AddButton(onPressed: () {}),
             ],
@@ -475,8 +526,10 @@ class _TabPosts extends StatelessWidget {
             label: const Text('이미지 첨부'),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.black,
-              backgroundColor: const Color(0xFFF4F4F6), // 스크린샷의 옅은 회색
-              side: BorderSide.none, // 테두리 없음
+              backgroundColor: const Color(0xFFF4F4F6),
+              // 스크린샷의 옅은 회색
+              side: BorderSide.none,
+              // 테두리 없음
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -503,10 +556,7 @@ class _TabPosts extends StatelessWidget {
           const SizedBox(height: 24),
           const Text(
             '등록된 게시물',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 16),
           // TODO: 향후 게시물 목록이 없을 때만 표시
@@ -545,15 +595,20 @@ class _TabInputTextField extends StatelessWidget {
       maxLines: maxLines,
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(fontSize: 14), // 힌트 텍스트 크기 조절
+        hintStyle: const TextStyle(fontSize: 14),
+        // 힌트 텍스트 크기 조절
         filled: true,
-        fillColor: const Color(0xFFF4F4F6), // 스크린샷과 동일한 배경색
+        fillColor: const Color(0xFFF4F4F6),
+        // 스크린샷과 동일한 배경색
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
         // 높이를 조절하기 위한 contentPadding
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
       ),
     );
   }
@@ -571,9 +626,7 @@ class _AddButton extends StatelessWidget {
       onPressed: onPressed,
       style: FilledButton.styleFrom(
         backgroundColor: Colors.black,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         padding: EdgeInsets.zero,
         minimumSize: const Size(48, 48), // 스크린샷의 정사각형 버튼
       ),
