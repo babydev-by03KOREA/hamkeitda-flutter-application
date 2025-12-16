@@ -2,12 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hamkeitda_flutter/features/admin/application/admin_controller.dart';
 import 'package:hamkeitda_flutter/features/admin/domain/admin_basic_state.dart';
-import 'package:hamkeitda_flutter/features/admin/presentation/admin_counsel_list_screen.dart';
-import 'package:hamkeitda_flutter/features/admin/presentation/counsel_readonly_sheet.dart';
 import 'package:hamkeitda_flutter/features/auth/application/auth_provider.dart';
 import 'package:hamkeitda_flutter/features/auth/domain/user.dart';
-import 'package:hamkeitda_flutter/features/counsel/domain/counsel_detail.dart';
-import 'package:hamkeitda_flutter/features/counsel/domain/counsel_form_state.dart';
 
 import '../../auth/application/auth_controller.dart';
 
@@ -16,6 +12,33 @@ class AdminDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<AsyncValue<AdminBasicState>>(adminBasicProvider, (prev, next) {
+      // 저장 성공/실패 토스트 처리 예시
+      final prevWasLoading = prev?.isLoading ?? false;
+
+      if (prevWasLoading && next.hasError) {
+        final msg = next.error.toString().replaceFirst('Exception: ', '');
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
+      }
+
+      if (prevWasLoading && next.hasValue) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('저장 완료!')));
+      }
+    });
+
+    ref.listen(
+      authControllerProvider.select((a) => a.valueOrNull?.facilityId),
+      (prev, next) {
+        if (prev != next && next != null) {
+          ref.invalidate(adminBasicProvider);
+        }
+      },
+    );
+
     final user = ref.watch(currentUserProvider);
     final basic = ref.watch(adminBasicProvider);
 
@@ -117,51 +140,31 @@ class _AdminBodyState extends ConsumerState<_AdminBody>
   late final TabController _tab;
   late AdminBasicState _s = widget.state;
   int _currentTabIndex = 0;
+  bool _dirty = false;
 
   @override
   void initState() {
     super.initState();
     _s = widget.state;
+
     _tab = TabController(length: 4, vsync: this);
-    // [추가] 탭 컨트롤러 리스너
     _tab.addListener(() {
-      // 탭 인덱스가 변경될 때마다 setState를 호출하여 UI를 다시 그리도록 함
-      if (_tab.indexIsChanging) {
-        setState(() {
-          _currentTabIndex = _tab.index;
-        });
-      }
+      if (_tab.indexIsChanging) setState(() => _currentTabIndex = _tab.index);
     });
+  }
 
-    ref.listen<AsyncValue<AdminBasicState>>(adminBasicProvider, (prev, next) {
-      if (!mounted) return;
+  @override
+  void didUpdateWidget(covariant _AdminBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
 
-      // 에러
-      if (next.hasError) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              next.error.toString().replaceFirst('Exception: ', ''),
-            ),
-          ),
-        );
-      }
+    // 서버에서 값이 새로 내려왔고, 아직 사용자가 수정 중이 아니면 폼을 덮어씌움
+    if (!_dirty && oldWidget.state != widget.state) {
+      setState(() => _s = widget.state);
+    }
+  }
 
-      // 저장 성공: prev가 loading이고 next가 data로 돌아왔을 때만
-      final wasLoading = prev?.isLoading ?? false;
-      final isData = next.hasValue;
-      if (wasLoading && isData) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('저장 완료!')));
-      }
-    });
-
-    _tab.addListener(() {
-      if (_tab.indexIsChanging) {
-        setState(() => _currentTabIndex = _tab.index);
-      }
-    });
+  void _markDirty() {
+    if (!_dirty) _dirty = true;
   }
 
   @override
@@ -190,28 +193,48 @@ class _AdminBodyState extends ConsumerState<_AdminBody>
               _TextField(
                 label: '시설명',
                 initial: _s.name,
-                onChanged: (v) => _s = _s.copyWith(name: v),
+                onChanged: (v) {
+                  _markDirty();
+                  _s = _s.copyWith(name: v);
+                },
               ),
-              _TextField(
+              _TimeRangeField(
                 label: '운영시간',
-                initial: _s.openHours,
-                onChanged: (v) => _s = _s.copyWith(openHours: v),
+                openTime: _s.openTime,
+                closedTime: _s.closedTime,
+                onOpenChanged: (t) {
+                  _markDirty();
+                  setState(() => _s = _s.copyWith(openTime: t));
+                },
+                onClosedChanged: (t) {
+                  _markDirty();
+                  setState(() => _s = _s.copyWith(closedTime: t));
+                },
               ),
               _TextField(
                 label: '전화번호',
                 initial: _s.phone,
-                onChanged: (v) => _s = _s.copyWith(phone: v),
+                onChanged: (v) {
+                  _markDirty();
+                  _s = _s.copyWith(phone: v);
+                },
               ),
               _TextField(
                 label: '주소',
                 initial: _s.address,
-                onChanged: (v) => _s = _s.copyWith(address: v),
+                onChanged: (v) {
+                  _markDirty();
+                  _s = _s.copyWith(address: v);
+                },
               ),
               _TextField(
                 label: '시설 소개',
                 initial: _s.description,
                 maxLines: 4,
-                onChanged: (v) => _s = _s.copyWith(description: v),
+                onChanged: (v) {
+                  _markDirty();
+                  _s = _s.copyWith(description: v);
+                },
               ),
               const SizedBox(height: 12),
               // [수정] 스크린샷과 동일한 이미지 첨부 UI
@@ -284,6 +307,101 @@ class _AdminBodyState extends ConsumerState<_AdminBody>
           const _TabPosts(),
         ].elementAt(_currentTabIndex),
       ],
+    );
+  }
+}
+
+class _TimeRangeField extends StatelessWidget {
+  final String label;
+  final TimeOfDay openTime;
+  final TimeOfDay closedTime;
+  final ValueChanged<TimeOfDay> onOpenChanged;
+  final ValueChanged<TimeOfDay> onClosedChanged;
+
+  const _TimeRangeField({
+    required this.label,
+    required this.openTime,
+    required this.closedTime,
+    required this.onOpenChanged,
+    required this.onClosedChanged,
+  });
+
+  String _fmt(TimeOfDay t) {
+    final h = t.hour.toString().padLeft(2, '0');
+    final m = t.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  Future<void> _pick(
+    BuildContext context,
+    TimeOfDay initial,
+    ValueChanged<TimeOfDay> onPicked,
+  ) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: initial,
+      builder: (context, child) {
+        // iOS 느낌(휠) 원하면 아래처럼. 안원하면 builder 빼도 됨.
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) onPicked(picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {}, // 전체 탭은 막고 버튼으로만 열어도 됨
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF4F4F6),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _pick(context, openTime, onOpenChanged),
+                      child: Text('오픈 ${_fmt(openTime)}'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () =>
+                          _pick(context, closedTime, onClosedChanged),
+                      child: Text('마감 ${_fmt(closedTime)}'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${_fmt(openTime)} - ${_fmt(closedTime)}',
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

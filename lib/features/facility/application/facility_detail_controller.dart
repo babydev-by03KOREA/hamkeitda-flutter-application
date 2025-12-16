@@ -30,13 +30,7 @@ class FacilityDetailController
   Future<void> fetchDetail() async {
     if (_id == null) return;
     state = const AsyncLoading();
-
-    // MOCK 모드면 더미로 즉시 렌더
-    if (USE_MOCK) {
-      await Future<void>.delayed(const Duration(milliseconds: 150));
-      state = AsyncData(_mockDetail(_id!));
-      return;
-    }
+    return;
 
     try {
       final dio = ref.read(dioProvider);
@@ -55,12 +49,6 @@ class FacilityDetailController
     required CounselRequest req,
   }) async {
     if (_id == null) return;
-
-    // MOCK 모드면 그냥 성공 처리
-    if (USE_MOCK) {
-      debugPrint('[MOCK] 상담 신청: ${req.toJson()}');
-      return;
-    }
 
     try {
       final dio = ref.read(dioProvider);

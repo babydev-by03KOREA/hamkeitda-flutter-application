@@ -14,19 +14,7 @@ import 'features/auth/application/auth_controller.dart';
 import 'features/auth/presentation/service_type_screen.dart';
 import 'features/facility/presentation/facility_map_screen.dart';
 
-// 2. [수정] 어떤 유저 객체든 받을 수 있는 유연한 Mock Controller
-class MockAuthController extends AuthController {
-  final AppUser? mockUser;
-
-  // 생성자에서 모킹할 유저(또는 null)를 받습니다.
-  MockAuthController(this.mockUser);
-
-  @override
-  Future<AppUser?> build() async {
-    // 생성자에서 받은 유저를 즉시 반환합니다.
-    return mockUser;
-  }
-}
+final GlobalKey<NavigatorState> rootNavKey = GlobalKey<NavigatorState>();
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,21 +31,27 @@ class App extends ConsumerWidget {
     final authState = ref.watch(authControllerProvider);
 
     return MaterialApp(
+      navigatorKey: rootNavKey,
       title: 'Hamkeitda',
       theme: lightTheme,
       debugShowCheckedModeBanner: false,
-      home: () {
-        final user = authState.valueOrNull;
+      home: authState.when(
+        loading: () =>
+            const Scaffold(body: Center(child: CircularProgressIndicator())),
+        error: (e, _) => Scaffold(body: Center(child: Text('오류: $e'))),
+        data: (user) {
+          if (user == null) return const ServiceTypeScreen();
 
-        if (user != null) {
-          if (user.role == UserRole.facility) {
-            return const AdminDashboardScreen();
+          switch (user.role) {
+            case UserRole.facility:
+              return const AdminDashboardScreen();
+            case UserRole.user:
+              return const FacilityMapScreen();
+            default:
+              return const ServiceTypeScreen();
           }
-          return const FacilityMapScreen();
-        }
-
-        return const ServiceTypeScreen();
-      }(),
+        },
+      ),
       routes: {
         ServiceTypeScreen.route: (_) => const ServiceTypeScreen(),
         AuthScreen.route: (_) => const AuthScreen(),

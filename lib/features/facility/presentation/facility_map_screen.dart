@@ -50,7 +50,10 @@ class _FacilityMapScreenState extends ConsumerState<FacilityMapScreen> {
               if (user == null || user.role == UserRole.guest) {
                 return TextButton.icon(
                   onPressed: () {
-                    Navigator.of(context).pushNamed('/auth');
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      '/service-type',
+                      (route) => false,
+                    );
                   },
                   icon: const Icon(Icons.login),
                   label: const Text('로그인'),

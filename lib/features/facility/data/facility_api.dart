@@ -13,7 +13,6 @@ class FacilityApi {
     required double lng,
     double radiusKm = 3,
   }) async {
-    if (USE_MOCK) return _mockNearby(lat, lng);
 
     try {
       final res = await _dio.get('/api/facility/nearby', queryParameters: {
@@ -31,8 +30,6 @@ class FacilityApi {
   // ─────────────────────────────────────────────
   // 상세
   Future<Map<String, dynamic>> fetchDetail(String id) async {
-    if (USE_MOCK) return _mockDetail(id);
-
     try {
       final res = await _dio.get('/api/facility/$id');
       return (res.data as Map<String, dynamic>);
@@ -49,7 +46,6 @@ class FacilityApi {
         required String phone,
         required String message,
       }) async {
-    if (USE_MOCK) return; // 목업 모드에서는 성공 처리만
 
     await _dio.post('/api/facility/$id/consult', data: {
       'name': name,

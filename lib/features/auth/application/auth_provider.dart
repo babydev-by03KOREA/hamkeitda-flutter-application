@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hamkeitda_flutter/features/auth/application/auth_controller.dart';
 import '../domain/user.dart';
 
-final currentUserProvider = StateProvider<AppUser?>((_) => null);
-// 로그인 성공 시 set: ref.read(currentUserProvider.notifier).state = user;
+final currentUserProvider = Provider<AppUser?>((ref) {
+  return ref.watch(authControllerProvider).valueOrNull;
+});

@@ -61,4 +61,24 @@ class AuthApi {
       rethrow;
     }
   }
+
+  Future<Map<String, dynamic>> refresh(String refreshToken) async {
+    try {
+      final res = await _dio.post(
+        '/api/auth/refresh',
+        data: {'refreshToken': refreshToken},
+      );
+
+      debugPrint('✅ REFRESH OK: ${res.requestOptions.uri}');
+      debugPrint('✅ BODY: ${res.data}');
+
+      return res.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      debugPrint('❌ JOIN FAIL: ${e.requestOptions.uri}');
+      debugPrint('❌ STATUS: ${e.response?.statusCode}');
+      debugPrint('❌ BODY: ${e.response?.data}');
+      debugPrint('❌ MSG: ${e.message}');
+      rethrow;
+    }
+  }
 }
