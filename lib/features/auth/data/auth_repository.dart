@@ -15,8 +15,18 @@ class AuthRepository {
     return AppUser.fromJson(data);
   }
 
-  Future<AppUser> signup(String name, String email, String password) async {
-    final data = await api.signup(name, email, password);
+  Future<AppUser> signup(
+    String nickname,
+    String email,
+    String password,
+    String role,
+  ) async {
+    final data = await api.signup(
+      nickname: nickname,
+      email: email,
+      password: password,
+      role: role,
+    );
     await _storage.write(key: _kToken, value: data['token'] as String?);
     return AppUser.fromJson(data);
   }

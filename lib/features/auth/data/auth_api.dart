@@ -1,27 +1,64 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:hamkeitda_flutter/core/lib.dart';
 
 class AuthApi {
   final Dio _dio;
-  AuthApi({Dio? dio}) : _dio = dio ?? Dio(BaseOptions(baseUrl: API_BASE_URL));
+
+  AuthApi({Dio? dio})
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(baseUrl: API_BASE_URL, contentType: 'application/json'),
+          );
 
   Future<Map<String, dynamic>> login(String email, String password) async {
-    // 실제 API 연결 시 아래 라인으로 교체
-    // final res = await _dio.post('/auth/login', data: {'email': email, 'password': password});
-    // return res.data as Map<String, dynamic>;
+    try {
+      final res = await _dio.post(
+        '/auth/login',
+        data: {'email': email, 'password': password},
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
 
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (email.endsWith('@test.com') && password == 'password123') {
-      return {'id': 'u_1', 'email': email, 'name': '테스터', 'token': 'fake-jwt-token'};
+      debugPrint('✅ LOGIN OK: ${res.requestOptions.uri}');
+      debugPrint('✅ BODY: ${res.data}');
+      return (res.data as Map<String, dynamic>)['data'] as Map<String, dynamic>;
+    } on DioException catch (e) {
+      debugPrint('❌ LOGIN FAIL: ${e.requestOptions.uri}');
+      debugPrint('❌ STATUS: ${e.response?.statusCode}');
+      debugPrint('❌ BODY: ${e.response?.data}');
+      debugPrint('❌ MSG: ${e.message}');
+      rethrow;
     }
-    throw DioException(requestOptions: RequestOptions(path: '/auth/login'), response: Response(requestOptions: RequestOptions(path: ''), statusCode: 401, data: {'message': '자격 증명 오류'}));
   }
 
-  Future<Map<String, dynamic>> signup(String name, String email, String password) async {
-    // final res = await _dio.post('/auth/signup', data: {'name': name, 'email': email, 'password': password});
-    // return res.data as Map<String, dynamic>;
+  Future<Map<String, dynamic>> signup({
+    required String nickname,
+    required String email,
+    required String password,
+    required String role
+  }) async {
+    try {
+      final res = await _dio.post(
+        '/auth/register',
+        data: {
+          'nickname': nickname,
+          'email': email,
+          'password': password,
+          'role': role,
+        },
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
 
-    await Future.delayed(const Duration(milliseconds: 900));
-    return {'id': 'u_2', 'email': email, 'name': name, 'token': 'fake-jwt-token'};
+      debugPrint('✅ JOIN OK: ${res.requestOptions.uri}');
+      debugPrint('✅ BODY: ${res.data}');
+      return (res.data as Map<String, dynamic>)['data']['user'];
+    } on DioException catch (e) {
+      debugPrint('❌ JOIN FAIL: ${e.requestOptions.uri}');
+      debugPrint('❌ STATUS: ${e.response?.statusCode}');
+      debugPrint('❌ BODY: ${e.response?.data}');
+      debugPrint('❌ MSG: ${e.message}');
+      rethrow;
+    }
   }
 }

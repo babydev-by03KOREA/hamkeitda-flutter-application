@@ -53,7 +53,7 @@ class AdminBasicController extends StateNotifier<AsyncValue<AdminBasicState>> {
       final user = ref.read(currentUserProvider);
       final api = ref.read(adminApiProvider);
       final fid = user?.facilityId ?? 'f-admin';
-      final data = await api.getFacilityForAdmin(fid);
+      final data = await api.getFacilityForAdmin(fid as String?);
       state = AsyncData(
         AdminBasicState(
           name: data['name'] ?? '',
@@ -72,7 +72,7 @@ class AdminBasicController extends StateNotifier<AsyncValue<AdminBasicState>> {
   Future<void> save(AdminBasicState s) async {
     final user = ref.read(currentUserProvider);
     final fid = user?.facilityId ?? 'f-admin';
-    await ref.read(adminApiProvider).updateBasic(fid, {
+    await ref.read(adminApiProvider).updateBasic(fid as String?, {
       'name': s.name,
       'openHours': s.openHours,
       'phone': s.phone,

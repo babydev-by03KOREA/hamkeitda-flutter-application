@@ -4,7 +4,7 @@ import 'package:hamkeitda_flutter/core/dio_provider.dart';
 import 'package:hamkeitda_flutter/features/counsel/domain/counsel_detail.dart';
 
 /// 시설별 상담 목록
-final counselListProvider = FutureProvider.family<List<CounselDetail>, String>((
+final counselListProvider = FutureProvider.family<List<CounselDetail>, int>((
   ref,
   facilityId,
 ) async {

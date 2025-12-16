@@ -30,57 +30,7 @@ class MockAuthController extends AuthController {
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 3. [수정] --dart-define 플래그로 'MOCK_ROLE' 값을 읽어옵니다.
-  const mockRole = String.fromEnvironment('MOCK_ROLE');
-
-  final overrides = <Override>[];
-  AppUser? userToMock; // 모킹할 유저 (null이면 guest)
-  bool useMock = false; // 모킹 사용 여부
-
-  // 4. [수정] MOCK_ROLE 값에 따라 모킹할 유저 데이터를 결정합니다.
-  switch (mockRole) {
-    case 'admin':
-    case 'facilityAdmin':
-    case 'superAdmin':
-      userToMock = const AppUser(
-        id: 'admin-1',
-        email: 'admin@test.com',
-        name: '관리자 (모드)',
-        role: UserRole.superAdmin,
-        facilityId: 'f-admin',
-      );
-      useMock = true;
-      break;
-    case 'member':
-      userToMock = const AppUser(
-        id: 'member-1',
-        email: 'member@test.com',
-        name: '일반회원 (모드)',
-        role: UserRole.member,
-        facilityId: 'f-member', // 필요시 수정
-      );
-      useMock = true;
-      break;
-    case 'guest':
-      userToMock = null; // guest는 로그인하지 않은 상태(null)로 설정
-      useMock = true;
-      break;
-    default:
-    // MOCK_ROLE 값이 없거나 인식할 수 없으면 모킹을 사용하지 않습니다.
-      useMock = false;
-  }
-
-  // 5. [수정] 모킹을 사용해야 할 경우에만 override합니다.
-  if (useMock) {
-    overrides.add(
-      authControllerProvider.overrideWith(
-        // MockAuthController에 위에서 결정된 userToMock을 주입
-            () => MockAuthController(userToMock),
-      ),
-    );
-  }
-
-  runApp(ProviderScope(overrides: overrides, child: const App()));
+  runApp(ProviderScope(child: const App()));
 }
 
 // App 위젯은 수정할 필요가 없습니다.
@@ -103,11 +53,9 @@ class App extends ConsumerWidget {
               user.role == UserRole.facilityAdmin) {
             return const AdminDashboardScreen();
           }
-          // [수정] MOCK_ROLE=member 일 때 FacilityMapScreen으로 갑니다.
           return const FacilityMapScreen();
         }
 
-        // [수정] MOCK_ROLE=guest 일 때 ServiceTypeScreen으로 갑니다.
         return const ServiceTypeScreen();
       }(),
       routes: {

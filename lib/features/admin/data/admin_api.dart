@@ -4,8 +4,8 @@ import 'package:hamkeitda_flutter/core/lib.dart';
 import '../../../core/dio_provider.dart';
 
 abstract class AdminApi {
-  Future<Map<String, dynamic>> getFacilityForAdmin(String facilityId);
-  Future<void> updateBasic(String facilityId, Map<String, dynamic> body);
+  Future<Map<String, dynamic>> getFacilityForAdmin(String? facilityId);
+  Future<void> updateBasic(String? facilityId, Map<String, dynamic> body);
 }
 
 final adminApiProvider = Provider<AdminApi>((ref) {
@@ -18,20 +18,20 @@ class RealAdminApi implements AdminApi {
   RealAdminApi(this._dio);
 
   @override
-  Future<Map<String, dynamic>> getFacilityForAdmin(String id) async {
-    final res = await _dio.get('/api/admin/facility/$id');
+  Future<Map<String, dynamic>> getFacilityForAdmin(String? id) async {
+    final res = await _dio.get('/admin/facility/$id');
     return (res.data as Map).cast<String, dynamic>();
   }
 
   @override
-  Future<void> updateBasic(String id, Map<String, dynamic> body) async {
-    await _dio.put('/api/admin/facility/$id', data: body);
+  Future<void> updateBasic(String? id, Map<String, dynamic> body) async {
+    await _dio.put('/admin/facility/$id', data: body);
   }
 }
 
 class MockAdminApi implements AdminApi {
   @override
-  Future<Map<String, dynamic>> getFacilityForAdmin(String id) async {
+  Future<Map<String, dynamic>> getFacilityForAdmin(String? id) async {
     await Future<void>.delayed(const Duration(milliseconds: 200));
     return {
       'name': '희망복지센터',
@@ -44,7 +44,7 @@ class MockAdminApi implements AdminApi {
   }
 
   @override
-  Future<void> updateBasic(String id, Map<String, dynamic> body) async {
+  Future<void> updateBasic(String? id, Map<String, dynamic> body) async {
     await Future<void>.delayed(const Duration(milliseconds: 150));
     // noop: 성공 가정
   }
