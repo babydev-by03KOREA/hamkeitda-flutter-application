@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hamkeitda_flutter/features/counsel/presentation/counsel_form_screen.dart';
 import 'package:hamkeitda_flutter/features/facility/application/facility_detail_controller.dart';
-import 'package:hamkeitda_flutter/features/facility/domain/facility_detail.dart';
-import 'package:hamkeitda_flutter/features/facility/domain/fee_info.dart';
-import 'package:hamkeitda_flutter/features/facility/domain/post_info.dart';
-import 'package:hamkeitda_flutter/features/facility/domain/program_info.dart';
-import 'package:hamkeitda_flutter/features/facility/domain/required_doc.dart';
+import '../domain/facility_detail.dart';
+import '../domain/fee_info.dart';
+import '../domain/post_info.dart';
+import '../domain/program_info.dart';
+import '../domain/required_doc.dart';
+import '../../counsel/presentation/counsel_form_screen.dart';
 
 class FacilityDetailScreen extends ConsumerStatefulWidget {
   static const route = '/facility/detail';
-  final String id;
+  final int id;
 
   const FacilityDetailScreen({super.key, required this.id});
 
@@ -25,19 +25,6 @@ class _FacilityDetailScreenState extends ConsumerState<FacilityDetailScreen>
   final _page = PageController();
   int _pageIndex = 0;
 
-  // 더미 캐러셀 이미지
-  final _images = const [
-    'assets/images/facility/001.jpg',
-    'assets/images/facility/002.jpg',
-    'assets/images/facility/003.jpg',
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    ref.read(facilityDetailControllerProvider.notifier).setId(widget.id);
-  }
-
   @override
   void dispose() {
     _page.dispose();
@@ -47,7 +34,7 @@ class _FacilityDetailScreenState extends ConsumerState<FacilityDetailScreen>
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(facilityDetailControllerProvider);
+    final state = ref.watch(facilityDetailControllerProvider(widget.id));
 
     return Scaffold(
       appBar: AppBar(
@@ -55,7 +42,7 @@ class _FacilityDetailScreenState extends ConsumerState<FacilityDetailScreen>
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: const Text('목록으로 돌아가기'),
+        title: const Text('기관목록'),
       ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -64,7 +51,7 @@ class _FacilityDetailScreenState extends ConsumerState<FacilityDetailScreen>
           headerSliverBuilder: (context, _) => [
             SliverToBoxAdapter(
               child: _HeaderCarousel(
-                images: _images,
+                images: detail.imageUrls,
                 page: _page,
                 pageIndex: _pageIndex,
                 onChanged: (i) => setState(() => _pageIndex = i),
@@ -87,7 +74,9 @@ class _FacilityDetailScreenState extends ConsumerState<FacilityDetailScreen>
       floatingActionButton: state.hasValue
           ? FloatingActionButton.extended(
               onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CounselFormScreen()),
+                MaterialPageRoute(
+                  builder: (_) => CounselFormScreen(facilityId: widget.id),
+                ),
               ),
               icon: const Icon(Icons.sms_outlined),
               label: const Text('상담 신청'),
@@ -97,8 +86,8 @@ class _FacilityDetailScreenState extends ConsumerState<FacilityDetailScreen>
   }
 }
 
-/// ─────────────────────────────────────────────────────────────
-/// 상단 캐러셀
+/// ─────────────────────────────────────────────
+/// 상단 캐러셀 (Network 이미지)
 class _HeaderCarousel extends StatelessWidget {
   final List<String> images;
   final PageController page;
@@ -114,6 +103,8 @@ class _HeaderCarousel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final safe = images.where((e) => e.trim().isNotEmpty).toList();
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: DecoratedBox(
@@ -128,43 +119,66 @@ class _HeaderCarousel extends StatelessWidget {
             children: [
               AspectRatio(
                 aspectRatio: 16 / 9,
-                child: PageView.builder(
-                  controller: page,
-                  itemCount: images.length,
-                  onPageChanged: onChanged,
-                  itemBuilder: (_, i) =>
-                      Image.asset(images[i], fit: BoxFit.cover),
-                ),
-              ),
-              // 인디케이터
-              Positioned(
-                bottom: 10,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 6,
-                    horizontal: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.35),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: List.generate(images.length, (i) {
-                      final active = i == pageIndex;
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        width: active ? 18 : 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
+                child: safe.isEmpty
+                    ? Container(
+                        color: const Color(0xFFEFEFEF),
+                        child: const Center(
+                          child: Icon(
+                            Icons.image_not_supported_outlined,
+                            size: 48,
+                            color: Colors.black26,
+                          ),
                         ),
-                      );
-                    }),
+                      )
+                    : PageView.builder(
+                        controller: page,
+                        itemCount: safe.length,
+                        onPageChanged: onChanged,
+                        itemBuilder: (_, i) => Image.network(
+                          safe[i],
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: const Color(0xFFEFEFEF),
+                            child: const Center(
+                              child: Icon(
+                                Icons.broken_image_outlined,
+                                size: 48,
+                                color: Colors.black26,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+              ),
+              if (safe.isNotEmpty)
+                Positioned(
+                  bottom: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 6,
+                      horizontal: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.35),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: List.generate(safe.length, (i) {
+                        final active = i == pageIndex.clamp(0, safe.length - 1);
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          width: active ? 18 : 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        );
+                      }),
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -173,7 +187,7 @@ class _HeaderCarousel extends StatelessWidget {
   }
 }
 
-/// ─────────────────────────────────────────────────────────────
+/// ─────────────────────────────────────────────
 /// 기본 정보 카드
 class _HeaderInfo extends StatelessWidget {
   final FacilityDetail detail;
@@ -202,7 +216,7 @@ class _HeaderInfo extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              if (detail.description != null)
+              if (detail.description != null && detail.description!.isNotEmpty)
                 Text(
                   detail.description!,
                   style: const TextStyle(color: Colors.black54, fontSize: 16),
@@ -243,7 +257,7 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-/// ─────────────────────────────────────────────────────────────
+/// ─────────────────────────────────────────────
 /// 탭바
 class _Tabs extends StatelessWidget {
   final TabController controller;
@@ -261,14 +275,10 @@ class _Tabs extends StatelessWidget {
         ),
         child: TabBar(
           controller: controller,
-          isScrollable: false,
-          // 1. 스크롤 비활성화 (탭 크기 균등 배분)
           indicatorPadding: const EdgeInsets.all(4),
-          // 2. (추천) 인디케이터에 여백 추가
           indicator: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
-            // 3. 여백에 맞게 값 조절 (20~24 추천)
             boxShadow: [
               BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6),
             ],
@@ -290,7 +300,7 @@ class _Tabs extends StatelessWidget {
   }
 }
 
-/// ─────────────────────────────────────────────────────────────
+/// ─────────────────────────────────────────────
 /// 탭: 필요한 서류
 class _DocsTab extends StatelessWidget {
   final List<RequiredDoc> items;
@@ -308,7 +318,7 @@ class _DocsTab extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         const Text(
-          '시설 이용을 위해 준비해야 할 서류들입니다. 파란색 서류명을 클릭하면 발급처를 확인할 수 있습니다.',
+          '시설 이용을 위해 준비해야 할 서류들입니다.',
           style: TextStyle(color: Colors.black54),
         ),
         const SizedBox(height: 12),
@@ -344,7 +354,7 @@ class _DocItem extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              if (doc.note != null) ...[
+              if (doc.note != null && doc.note!.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -366,8 +376,7 @@ class _DocItem extends StatelessWidget {
   }
 }
 
-/// ─────────────────────────────────────────────────────────────
-/// 탭: 프로그램 소개
+/// 탭: 프로그램
 class _ProgramsTab extends StatelessWidget {
   final List<ProgramInfo> items;
 
@@ -375,6 +384,7 @@ class _ProgramsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (items.isEmpty) return const Center(child: Text('등록된 프로그램이 없습니다.'));
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: items.length,
@@ -397,8 +407,7 @@ class _ProgramsTab extends StatelessWidget {
   }
 }
 
-/// ─────────────────────────────────────────────────────────────
-/// 탭: 이용 안내(요금)
+/// 탭: 요금
 class _FeesTab extends StatelessWidget {
   final List<FeeInfo> items;
 
@@ -406,6 +415,7 @@ class _FeesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (items.isEmpty) return const Center(child: Text('등록된 이용료 정보가 없습니다.'));
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: items.length,
@@ -433,7 +443,6 @@ class _FeesTab extends StatelessWidget {
   }
 }
 
-/// ─────────────────────────────────────────────────────────────
 /// 탭: 게시물
 class _PostsTab extends StatelessWidget {
   final List<PostInfo> items;
@@ -442,9 +451,7 @@ class _PostsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return const Center(child: Text('등록된 게시물이 없습니다.'));
-    }
+    if (items.isEmpty) return const Center(child: Text('등록된 게시물이 없습니다.'));
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: items.length,
@@ -462,7 +469,6 @@ class _PostsTab extends StatelessWidget {
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
           subtitle: p.preview != null ? Text(p.preview!) : null,
-          onTap: () {}, // 필요 시 상세로
         );
       },
     );

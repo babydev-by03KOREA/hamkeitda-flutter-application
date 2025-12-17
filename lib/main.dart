@@ -57,7 +57,18 @@ class App extends ConsumerWidget {
         AuthScreen.route: (_) => const AuthScreen(),
         FacilityMapScreen.route: (_) => const FacilityMapScreen(),
         FacilityDetailScreen.route: (ctx) {
-          final id = ModalRoute.of(ctx)!.settings.arguments as String;
+          final arg = ModalRoute.of(ctx)?.settings.arguments;
+
+          final int id = switch (arg) {
+            int v => v,
+            String s => int.tryParse(s) ?? 0,
+            _ => 0,
+          };
+
+          if (id == 0) {
+            return const Scaffold(body: Center(child: Text('시설 ID가 없습니다.')));
+          }
+
           return FacilityDetailScreen(id: id);
         },
         AdminGuard.route: (ctx) =>

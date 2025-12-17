@@ -11,13 +11,16 @@ part '../../../generated/facility_detail.g.dart';
 @freezed
 class FacilityDetail with _$FacilityDetail {
   const factory FacilityDetail({
-    required String id,
+    required int id,
     required String name,
     String? description,
     String? phone,
     String? openHours,
     String? address,
+
     String? imageUrl,
+    @Default(<String>[]) List<String> imageUrls,
+
     @Default([]) List<RequiredDoc> requiredDocs,
     @Default([]) List<ProgramInfo> programs,
     @Default([]) List<FeeInfo> fees,

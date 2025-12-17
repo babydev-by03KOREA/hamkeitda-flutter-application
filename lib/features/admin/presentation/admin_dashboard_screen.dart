@@ -8,7 +8,9 @@ import 'package:hamkeitda_flutter/features/admin/application/documents_controlle
 import 'package:hamkeitda_flutter/features/admin/application/facility_images_controller.dart';
 import 'package:hamkeitda_flutter/features/admin/application/fees_controller.dart';
 import 'package:hamkeitda_flutter/features/admin/application/programs_controller.dart';
+import 'package:hamkeitda_flutter/features/admin/data/admin_counsel_provider.dart';
 import 'package:hamkeitda_flutter/features/admin/domain/admin_basic_state.dart';
+import 'package:hamkeitda_flutter/features/admin/presentation/admin_counsel_list_screen.dart';
 import 'package:hamkeitda_flutter/features/auth/application/auth_provider.dart';
 import 'package:hamkeitda_flutter/features/auth/domain/user.dart';
 import 'package:image_picker/image_picker.dart';
@@ -34,7 +36,7 @@ class AdminDashboardScreen extends ConsumerWidget {
       if (prevWasLoading && next.hasValue) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('저장 완료!')));
+        );
       }
     });
 
@@ -53,6 +55,7 @@ class AdminDashboardScreen extends ConsumerWidget {
 
     final user = ref.watch(currentUserProvider);
     final basic = ref.watch(adminBasicProvider);
+    final facilityId = user?.facilityId;
 
     return Scaffold(
       appBar: AppBar(
@@ -60,21 +63,64 @@ class AdminDashboardScreen extends ConsumerWidget {
         actions: [
           Consumer(
             builder: (context, ref, _) {
-              final auth = ref.watch(authControllerProvider);
-              final user = auth.valueOrNull;
+              final user = ref.watch(currentUserProvider);
+              final facilityId = user?.facilityId;
 
-              // Guest: 로그인
-              if (user == null || user.role == UserRole.guest) {
-                return TextButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pushNamed('/auth');
-                  },
-                  icon: const Icon(Icons.login),
-                  label: const Text('로그인'),
+              if (facilityId == null) return const SizedBox.shrink();
+
+              final badge = ref.watch(counselBadgeCountProvider(facilityId));
+
+              void go() {
+                // 디버그용
+                debugPrint('🔔 bell tapped, facilityId=$facilityId');
+
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const AdminCounselListScreen(),
+                  ),
                 );
               }
 
-              // 로그인 상태: 로그아웃
+              final count = badge.valueOrNull ?? 0;
+
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_none),
+                    onPressed: go, // ✅ 로딩/에러여도 무조건 클릭 가능
+                  ),
+                  if (count > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+
+          // 🚪 로그아웃 버튼
+          Consumer(
+            builder: (context, ref, _) {
               return TextButton.icon(
                 onPressed: () async {
                   await ref.read(authControllerProvider.notifier).signOut();
@@ -89,17 +135,25 @@ class AdminDashboardScreen extends ConsumerWidget {
             },
           ),
         ],
+
+        // 👋 인사말
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(32),
-          child: Padding(
-            padding: const EdgeInsets.only(left: 16, bottom: 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '안녕하세요, ${user?.name ?? '관리자'}님',
-                style: const TextStyle(color: Colors.black54),
-              ),
-            ),
+          child: Consumer(
+            builder: (context, ref, _) {
+              final user = ref.watch(currentUserProvider);
+
+              return Padding(
+                padding: const EdgeInsets.only(left: 16, bottom: 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '안녕하세요, ${user?.name ?? '관리자'}님',
+                    style: const TextStyle(color: Colors.black54),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ),

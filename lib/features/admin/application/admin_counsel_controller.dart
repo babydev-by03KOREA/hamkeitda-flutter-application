@@ -1,18 +1,20 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hamkeitda_flutter/features/admin/data/admin_counsel_repository.dart';
+import 'package:hamkeitda_flutter/features/admin/data/admin_counsel_repository_provider.dart';
 import 'package:hamkeitda_flutter/features/admin/domain/admin_counsel.dart';
+import 'package:hamkeitda_flutter/features/admin/domain/admin_counsel_models.dart';
 import 'package:hamkeitda_flutter/features/counsel/domain/counsel_form_state.dart';
 
 final adminCounselListProvider = StateNotifierProvider.family<
     AdminCounselListController,
-    AsyncValue<List<AdminCounselSummary>>,
+    AsyncValue<List<CounselNotification>>,
     int>((ref, facilityId) {
   final repo = ref.read(adminCounselRepositoryProvider);
   return AdminCounselListController(ref, repo, facilityId)..load();
 });
 
 class AdminCounselListController
-    extends StateNotifier<AsyncValue<List<AdminCounselSummary>>> {
+    extends StateNotifier<AsyncValue<List<CounselNotification>>> {
   AdminCounselListController(this.ref, this._repo, this.facilityId)
       : super(const AsyncLoading());
 

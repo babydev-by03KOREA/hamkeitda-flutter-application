@@ -1,56 +1,61 @@
-import 'dart:convert';
-
-import 'package:dio/dio.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hamkeitda_flutter/core/dio_provider.dart';
-import 'package:hamkeitda_flutter/features/admin/domain/admin_counsel.dart';
-
-final adminCounselRepositoryProvider =
-Provider<AdminCounselRepository>((ref) {
-  final dio = ref.read(dioProvider);
-  return AdminCounselRepository(dio);
-});
+import '../domain/admin_counsel_models.dart';
+import 'admin_counsel_api.dart';
 
 class AdminCounselRepository {
-  final Dio _dio;
-  AdminCounselRepository(this._dio);
+  final AdminCounselApi api;
 
-  /// 상담 신청 목록 (Page 조회)
-  Future<List<AdminCounselSummary>> fetchCounsels({
+  AdminCounselRepository(this.api);
+
+  /// ✅ paging (Spring Page JSON)
+  Future<CounselPageResponse> fetchPage({
     required int facilityId,
-    int page = 0,
-    int size = 20,
+    required int page,
+    required int size,
   }) async {
-    final res = await _dio.get(
-      '/api/admin/facility/$facilityId/counsels',
-      queryParameters: {'page': page, 'size': size},
+    final raw = await api.getCounsels(
+      facilityId: facilityId,
+      page: page,
+      size: size,
     );
 
-    // Spring Page 형태: { content: [...], totalElements: ..., ... }
-    final content = res.data['content'] as List<dynamic>;
-    return content
-        .map((e) =>
-        AdminCounselSummary.fromJson((e as Map).cast<String, dynamic>()))
-        .toList();
+    final m = Map<String, dynamic>.from(raw as Map);
+    return CounselPageResponse.fromJson(m);
   }
 
-  /// 상담 상세 (answers JSON 포함)
-  Future<AdminCounselDetail> fetchCounselDetail(int counselId) async {
-    final res = await _dio.get('/api/admin/counsels/$counselId');
-    final raw = (res.data as Map).cast<String, dynamic>();
+  /// ✅ (기존 코드 호환) 목록 전부 불러오기
+  /// - 페이지네이션 API를 여러 번 호출해서 전체 합치는 방식
+  Future<List<CounselNotification>> fetchCounsels({
+    required int facilityId,
+    int pageSize = 50,
+  }) async {
+    int page = 0;
+    final items = <CounselNotification>[];
 
-    // answers 가 String 으로 올 때
-    final ansRaw = raw['answers'];
-    Map<String, dynamic> answersMap;
-    if (ansRaw is String) {
-      answersMap = jsonDecode(ansRaw) as Map<String, dynamic>;
-    } else {
-      answersMap = (ansRaw as Map).cast<String, dynamic>();
+    while (true) {
+      final res = await fetchPage(
+        facilityId: facilityId,
+        page: page,
+        size: pageSize,
+      );
+      items.addAll(res.content);
+      if (res.last) break;
+      page++;
     }
+    return items;
+  }
 
-    return AdminCounselDetail(
-      summary: AdminCounselSummary.fromJson(raw),
-      answersJson: answersMap,
-    );
+  /// ✅ (기존 코드 호환) 단건 조회
+  /// ⚠️ 백엔드에 단건 endpoint가 없어서 "임시"로 구현:
+  ///   - 0페이지를 크게 가져와서 id로 찾음
+  ///   - 데이터가 많아지면 반드시 백엔드에 단건 API 만들어야 함
+  Future<CounselNotification> fetchCounselDetail(int counselId) async {
+    // 임시로 크게 가져오기 (필요시 키우기)
+    final res = await fetchPage(facilityId: 0, page: 0, size: 200);
+
+    final found = res.content.where((e) => e.id == counselId).toList();
+    if (found.isEmpty) {
+      throw Exception('상담 신청서를 찾을 수 없습니다. id=$counselId');
+    }
+    return found.first;
   }
 }

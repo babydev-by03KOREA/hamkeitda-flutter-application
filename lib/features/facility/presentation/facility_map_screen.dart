@@ -20,10 +20,10 @@ class FacilityMapScreen extends ConsumerStatefulWidget {
 class _FacilityMapScreenState extends ConsumerState<FacilityMapScreen> {
   GoogleMapController? _map;
   double _zoom = 14;
+  CameraPosition? _lastCamera;
 
   @override
   Widget build(BuildContext context) {
-    final mode = ref.watch(serviceTypeProvider);
     final facilities = ref.watch(facilityControllerProvider);
 
     return Scaffold(
@@ -77,6 +77,8 @@ class _FacilityMapScreenState extends ConsumerState<FacilityMapScreen> {
         ],
       ),
       body: facilities.when(
+        skipLoadingOnReload: true,
+        skipLoadingOnRefresh: true,
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('불러오는 중 오류: $e')),
         data: (list) => _MapAndList(
@@ -106,9 +108,20 @@ class _FacilityMapScreenState extends ConsumerState<FacilityMapScreen> {
               target: initialPos,
               zoom: _zoom,
             ),
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
             onMapCreated: (c) => _map = c,
+
+            onCameraMove: (pos) {
+              _lastCamera = pos;
+            },
+            onCameraIdle: () {
+              final center = _lastCamera?.target;
+              if (center == null) return;
+
+              ref.read(facilityControllerProvider.notifier)
+                ..currentCenter = center
+                ..refreshByCenter(center);
+            },
+
             markers: list.map(_toMarker).toSet(),
           ),
         ),
@@ -125,15 +138,19 @@ class _FacilityMapScreenState extends ConsumerState<FacilityMapScreen> {
               borderSide: BorderSide.none,
             ),
           ),
-          onSubmitted: (_) =>
-              ref.read(facilityControllerProvider.notifier).refreshNearby(),
+          onSubmitted: (_) {
+            final c = ref.read(facilityControllerProvider.notifier);
+            if (c.currentCenter != null) {
+              c.refreshByCenter(c.currentCenter!);
+            }
+          },
         ),
       ),
     );
   }
 
   Marker _toMarker(Facility f) => Marker(
-    markerId: MarkerId(f.id),
+    markerId: MarkerId(f.id.toString()),
     position: LatLng(f.lat, f.lng),
     infoWindow: InfoWindow(
       title: f.name,
@@ -162,16 +179,25 @@ class _MapAndList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final center = LatLng(facilities.first.lat, facilities.first.lng);
+    const LatLng seongbukJongam = LatLng(37.5985, 127.0345);
+
+    final center = facilities.isNotEmpty
+        ? LatLng(facilities.first.lat, facilities.first.lng)
+        : seongbukJongam;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         const SizedBox(height: 12),
+
         ClipRRect(
           borderRadius: BorderRadius.circular(20),
           child: Stack(
             children: [
-              SizedBox(height: 320, child: mapBuilder(context, center)),
+              SizedBox(
+                height: 320,
+                child: mapBuilder(context, const LatLng(37.5985, 127.0345)),
+              ),
               Positioned(
                 right: 12,
                 top: 12,
@@ -191,12 +217,27 @@ class _MapAndList extends StatelessWidget {
             ],
           ),
         ),
+
         const SizedBox(height: 20),
         Text('근처 시설', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
-        ...facilities.map((f) => _FacilityTile(f)).toList(),
-        const SizedBox(height: 8),
-        ...facilities.map((f) => _FacilityCard(f)).toList(),
+
+        if (facilities.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: Text(
+                '근처에 등록된 시설이 없어요.\n반경을 늘리거나 다른 지역에서 다시 시도해 주세요.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF6B7280)),
+              ),
+            ),
+          )
+        else ...[
+          ...facilities.map((f) => _FacilityTile(f)),
+          const SizedBox(height: 8),
+          ...facilities.map((f) => _FacilityCard(f)),
+        ],
       ],
     );
   }
@@ -255,7 +296,7 @@ class _FacilityTile extends StatelessWidget {
     onTap: () => Navigator.pushNamed(
       context,
       FacilityDetailScreen.route,
-      arguments: f.id, // ← 시설 id 전달
+      arguments: f.id,
     ),
   );
 }
@@ -287,12 +328,11 @@ class _FacilityCard extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Image.network(
-                  f.imageUrl ??
+                  f.primaryImage ??
                       'https://placehold.co/100x100/EFEFEF/AAAAAA?text=Image',
                   width: 100,
                   height: 100,
                   fit: BoxFit.cover,
-                  // 이미지 로딩 실패 시
                   errorBuilder: (context, error, stackTrace) => Container(
                     width: 100,
                     height: 100,

@@ -9,7 +9,9 @@ import 'package:hamkeitda_flutter/features/counsel/domain/help_level.dart';
 import 'package:hamkeitda_flutter/features/facility/application/facility_detail_controller.dart';
 
 class CounselFormScreen extends ConsumerWidget {
-  const CounselFormScreen({super.key});
+  final int facilityId;
+
+  const CounselFormScreen({super.key, required this.facilityId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -23,8 +25,29 @@ class CounselFormScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const Text('신청자 정보', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+
+            TextField(
+              decoration: const InputDecoration(labelText: '신청자 이름'),
+              onChanged: notifier.setName,
+            ),
+
+            const SizedBox(height: 8),
+
+            TextField(
+              decoration: const InputDecoration(labelText: '연락처'),
+              keyboardType: TextInputType.phone,
+              onChanged: notifier.setPhone,
+            ),
+
             // ─ 기본정보 ─
             _BasicHeaderSection(
+              applicantName: form.name,
+              applicantPhone: form.phone,
+              onApplicantNameChanged: notifier.setName,
+              onApplicantPhoneChanged: notifier.setPhone,
+
               writer: form.writer,
               writeDate: form.writeDate,
               height: form.height,
@@ -102,13 +125,18 @@ class CounselFormScreen extends ConsumerWidget {
                 );
 
                 await ref
-                    .read(facilityDetailControllerProvider.notifier)
-                    .submitConsult(req: req);
+                    .read(facilityDetailControllerProvider(facilityId).notifier)
+                    .submitConsult(facilityId: facilityId, req: req);
 
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('상담 신청이 접수되었습니다.')),
                 );
                 notifier.reset();
+                Future.delayed(const Duration(milliseconds: 500), () {
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+                });
               },
               child: const Text('제출하기'),
             ),
@@ -121,6 +149,10 @@ class CounselFormScreen extends ConsumerWidget {
 
 class _BasicHeaderSection extends StatelessWidget {
   const _BasicHeaderSection({
+    required this.applicantName,
+    required this.applicantPhone,
+    required this.onApplicantNameChanged,
+    required this.onApplicantPhoneChanged,
     required this.writer,
     required this.writeDate,
     required this.height,
@@ -136,6 +168,11 @@ class _BasicHeaderSection extends StatelessWidget {
     required this.onGenderChanged,
     required this.onGradeChanged,
   });
+
+  final String applicantName;
+  final String applicantPhone;
+  final ValueChanged<String> onApplicantNameChanged;
+  final ValueChanged<String> onApplicantPhoneChanged;
 
   final String writer;
   final DateTime? writeDate;
@@ -294,16 +331,6 @@ class _AdlSection extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 AdlRow(
-                  label: '옷 벗고 입기',
-                  value: v('clothes'),
-                  onChanged: (lv) => onChanged('clothes', lv),
-                ),
-                AdlRow(
-                  label: '식사 하기',
-                  value: v('eat'),
-                  onChanged: (lv) => onChanged('eat', lv),
-                ),
-                AdlRow(
                   label: '일어나 앉기',
                   value: v('sitUp'),
                   onChanged: (lv) => onChanged('sitUp', lv),
@@ -354,7 +381,7 @@ class _AdlSection extends StatelessWidget {
                   onChanged: (lv) => onChanged('urineControl', lv),
                 ),
               ],
-            )
+            ),
           ],
         ),
       ),

@@ -1,19 +1,31 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+
 part '../../../generated/facility.freezed.dart';
 part '../../../generated/facility.g.dart';
 
-//  dart run build_runner build
 @freezed
 class Facility with _$Facility {
+  const Facility._();
+
   const factory Facility({
-    required String id,
+    required int id, // MarkerId가 String이라 지금 코드와 맞춤
     required String name,
-    String? phone,
-    String? openHours, // 예: "09:00 - 18:00"
-    String? imageUrl,
     required double lat,
     required double lng,
-    required String description,
+
+    String? phone,
+    String? openHours,
+    String? description,
+
+    // 대표 1장 (지도 카드에서 사용)
+    String? imageUrl,
+
+    // 상세에서 여러장 (서버가 주면 받기)
+    @Default(<String>[]) List<String> imageUrls,
   }) = _Facility;
+
+  // 대표이미지 fallback: imageUrl 없으면 imageUrls 첫 장
+  String? get primaryImage => imageUrl ?? (imageUrls.isNotEmpty ? imageUrls.first : null);
+
   factory Facility.fromJson(Map<String, dynamic> json) => _$FacilityFromJson(json);
 }

@@ -8,8 +8,8 @@ part of '../features/facility/domain/fee_info.dart';
 
 _$FeeInfoImpl _$$FeeInfoImplFromJson(Map<String, dynamic> json) =>
     _$FeeInfoImpl(
-      item: json['item'] as String,
-      price: json['price'] as String,
+      item: json['item'] as String? ?? '',
+      price: json['price'] as String? ?? '',
       note: json['note'] as String?,
     );
 
