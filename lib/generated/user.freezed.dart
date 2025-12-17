@@ -24,6 +24,7 @@ mixin _$AppUser {
   int get id => throw _privateConstructorUsedError;
   String get email => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
+  @UserRoleConverter()
   UserRole get role => throw _privateConstructorUsedError;
   String get accessToken => throw _privateConstructorUsedError;
   String get refreshToken => throw _privateConstructorUsedError;
@@ -47,7 +48,7 @@ abstract class $AppUserCopyWith<$Res> {
     int id,
     String email,
     String name,
-    UserRole role,
+    @UserRoleConverter() UserRole role,
     String accessToken,
     String refreshToken,
     int? facilityId,
@@ -125,7 +126,7 @@ abstract class _$$AppUserImplCopyWith<$Res> implements $AppUserCopyWith<$Res> {
     int id,
     String email,
     String name,
-    UserRole role,
+    @UserRoleConverter() UserRole role,
     String accessToken,
     String refreshToken,
     int? facilityId,
@@ -196,9 +197,9 @@ class _$AppUserImpl implements _AppUser {
     required this.id,
     this.email = '',
     this.name = '',
-    required this.role,
-    required this.accessToken,
-    required this.refreshToken,
+    @UserRoleConverter() required this.role,
+    this.accessToken = '',
+    this.refreshToken = '',
     this.facilityId,
   });
 
@@ -214,10 +215,13 @@ class _$AppUserImpl implements _AppUser {
   @JsonKey()
   final String name;
   @override
+  @UserRoleConverter()
   final UserRole role;
   @override
+  @JsonKey()
   final String accessToken;
   @override
+  @JsonKey()
   final String refreshToken;
   @override
   final int? facilityId;
@@ -276,9 +280,9 @@ abstract class _AppUser implements AppUser {
     required final int id,
     final String email,
     final String name,
-    required final UserRole role,
-    required final String accessToken,
-    required final String refreshToken,
+    @UserRoleConverter() required final UserRole role,
+    final String accessToken,
+    final String refreshToken,
     final int? facilityId,
   }) = _$AppUserImpl;
 
@@ -291,6 +295,7 @@ abstract class _AppUser implements AppUser {
   @override
   String get name;
   @override
+  @UserRoleConverter()
   UserRole get role;
   @override
   String get accessToken;

@@ -81,4 +81,21 @@ class AuthApi {
       rethrow;
     }
   }
+
+  Future<Map<String, dynamic>> me() async {
+    try {
+      final res = await _dio.get('/auth/me');
+
+      debugPrint('✅ ME OK: ${res.requestOptions.uri}');
+      debugPrint('✅ BODY: ${res.data}');
+
+      return (res.data as Map).cast<String, dynamic>();
+    } on DioException catch (e) {
+      debugPrint('❌ JOIN FAIL: ${e.requestOptions.uri}');
+      debugPrint('❌ STATUS: ${e.response?.statusCode}');
+      debugPrint('❌ BODY: ${e.response?.data}');
+      debugPrint('❌ MSG: ${e.message}');
+      rethrow;
+    }
+  }
 }

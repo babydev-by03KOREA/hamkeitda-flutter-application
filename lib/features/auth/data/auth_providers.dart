@@ -12,7 +12,9 @@ final authApiProvider = Provider<AuthApi>((ref) {
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final api = ref.read(authApiProvider);
-  return AuthRepository(api);
+  final tokenStorage = ref.read(tokenStorageProvider);
+
+  return AuthRepository(api, tokenStorage);
 });
 
 final tokenStorageProvider = Provider<TokenStorage>((ref) {

@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hamkeitda_flutter/core/lib.dart';
-import 'package:hamkeitda_flutter/features/auth/application/auth_controller.dart';
 import 'package:hamkeitda_flutter/features/auth/data/auth_providers.dart';
 import 'package:hamkeitda_flutter/main.dart';
 
@@ -33,19 +32,21 @@ final dioProvider = Provider<Dio>((ref) {
 
   Future<bool> tryRefreshToken() async {
     final rt = await tokenStorage.getRefresh();
-    debugPrint('[REFRESH] hasRT=${rt != null && rt.isNotEmpty}');
     if (rt == null || rt.isEmpty) return false;
 
     final res = await refreshDio.post(
       '/api/auth/refresh',
-      data: {'refreshToken': rt},
+      options: Options(headers: {'Authorization': 'Bearer $rt'}),
     );
 
-    final data = (res.data as Map).cast<String, dynamic>();
+    final body = res.data as Map<String, dynamic>;
+    final data = (body['data'] as Map<String, dynamic>);
+
     final newAccess = data['accessToken'] as String?;
-    final newRefresh = (data['refreshToken'] as String?) ?? rt;
+    final newRefresh = data['refreshToken'] as String?;
 
     if (newAccess == null || newAccess.isEmpty) return false;
+    if (newRefresh == null || newRefresh.isEmpty) return false;
 
     await tokenStorage.save(accessToken: newAccess, refreshToken: newRefresh);
     return true;
@@ -62,65 +63,59 @@ final dioProvider = Provider<Dio>((ref) {
   dio.interceptors.add(
     QueuedInterceptorsWrapper(
       onRequest: (options, handler) async {
-        // access token 자동 첨부
-        final at = await tokenStorage.getAccess();
-        debugPrint(
-          '[REQ] ${options.uri}  hasAT=${at != null && at.isNotEmpty}',
-        );
-        if (at != null && at.isNotEmpty) {
-          options.headers['Authorization'] = 'Bearer $at';
+        // refresh는 RT로 따로 보낼 거라서 여기서 건드리지 않기
+        final isRefresh = options.path.contains('/api/auth/refresh');
+        if (!isRefresh) {
+          final at = await tokenStorage.getAccess();
+          if (at != null && at.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $at';
+          }
         }
         return handler.next(options);
       },
       onError: (e, handler) async {
-        debugPrint(
-          '[ERR] ${e.requestOptions.uri} status=${e.response?.statusCode}',
-        );
         final status = e.response?.statusCode;
+        final isRefreshCall = e.requestOptions.path.contains(
+          '/api/auth/refresh',
+        );
 
-        // 401이면 refresh 시도
-        if (status == 401) {
-          final path = e.requestOptions.path;
-
-          // refresh 자체가 401이면 끝
-          if (path.contains('/api/auth/refresh')) {
-            forceLogoutMoveToServiceType();
-            return handler.next(e);
-          }
-
-          // refresh 동시성 제어
+        if (status == 401 && !isRefreshCall) {
+          // refresh 시도
           if (!isRefreshing) {
             isRefreshing = true;
-            refreshFuture = tryRefreshToken().whenComplete(() {
-              isRefreshing = false;
-            });
+            refreshFuture = tryRefreshToken().whenComplete(
+              () => isRefreshing = false,
+            );
           }
 
           final ok = await refreshFuture!;
-          if (!ok) {
-            forceLogoutMoveToServiceType();
-            return handler.next(e);
-          }
+          if (!ok) return handler.next(e);
 
-          // refresh 성공 → 원 요청 재시도
           final newAccess = await tokenStorage.getAccess();
-          final retryOptions = e.requestOptions;
+          if (newAccess == null || newAccess.isEmpty) return handler.next(e);
 
-          retryOptions.headers['Authorization'] = 'Bearer $newAccess';
+          final req = e.requestOptions;
 
           try {
-            final response = await dio.fetch(retryOptions);
-            return handler.resolve(response);
-          } catch (err) {
-            // 재시도도 실패하면 로그아웃
-            forceLogoutMoveToServiceType();
+            final res = await dio.request(
+              req.path,
+              data: req.data,
+              queryParameters: req.queryParameters,
+              options: Options(
+                method: req.method,
+                headers: {
+                  ...req.headers,
+                  'Authorization': 'Bearer $newAccess',
+                },
+                contentType: req.contentType,
+                responseType: req.responseType,
+              ),
+            );
+            return handler.resolve(res);
+          } catch (_) {
             return handler.next(e);
           }
         }
-
-        dio.interceptors.add(
-          LogInterceptor(requestBody: true, responseBody: true),
-        );
 
         return handler.next(e);
       },

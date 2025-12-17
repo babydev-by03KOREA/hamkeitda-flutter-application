@@ -4,7 +4,6 @@ import 'package:hamkeitda_flutter/core/dio_provider.dart';
 import 'package:hamkeitda_flutter/features/admin/data/admin_api.dart';
 import 'package:hamkeitda_flutter/features/admin/data/admin_repository.dart';
 import 'package:hamkeitda_flutter/features/admin/domain/admin_basic_state.dart';
-import '../../auth/application/auth_provider.dart';
 import '../../auth/application/auth_controller.dart';
 
 final adminApiProvider = Provider<AdminApi>((ref) {
@@ -24,7 +23,7 @@ final adminBasicProvider =
 class AdminBasicController extends AsyncNotifier<AdminBasicState> {
   @override
   Future<AdminBasicState> build() async {
-    final user = ref.watch(currentUserProvider);
+    final user = ref.watch(authControllerProvider).valueOrNull;
     final fid = user?.facilityId;
 
     if (fid == null) {
@@ -48,7 +47,7 @@ class AdminBasicController extends AsyncNotifier<AdminBasicState> {
 
     state = await AsyncValue.guard(() async {
       final repo = ref.read(adminRepositoryProvider);
-      final user = ref.read(currentUserProvider);
+      final user = ref.read(authControllerProvider).valueOrNull;
       final fid = user?.facilityId;
 
       if (fid == null) {

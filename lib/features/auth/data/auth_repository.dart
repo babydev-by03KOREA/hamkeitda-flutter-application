@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:hamkeitda_flutter/features/auth/data/token_storage.dart';
 import 'package:hamkeitda_flutter/features/auth/domain/register_result.dart';
-import 'package:hamkeitda_flutter/features/auth/domain/signup_response.dart';
 import 'package:hamkeitda_flutter/features/auth/domain/token_pair.dart';
 import '../domain/user.dart';
 import 'auth_api.dart';
@@ -10,11 +10,12 @@ import 'auth_api.dart';
 class AuthRepository {
   final AuthApi api;
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  final TokenStorage tokenStorage;
 
   static const _kAccess = 'access_token';
   static const _kRefresh = 'refresh_token';
 
-  AuthRepository(this.api);
+  AuthRepository(this.api, this.tokenStorage);
 
   UserRole mapRole(String raw) {
     switch (raw) {
@@ -54,11 +55,11 @@ class AuthRepository {
   }
 
   Future<RegisterResult> signup(
-      String nickname,
-      String email,
-      String password,
-      String role,
-      ) async {
+    String nickname,
+    String email,
+    String password,
+    String role,
+  ) async {
     try {
       final raw = await api.signup(
         nickname: nickname,
@@ -107,5 +108,42 @@ class AuthRepository {
 
   Future<String?> readRefreshToken() {
     return _storage.read(key: _kRefresh);
+  }
+
+  Future<AppUser> me() async {
+    final json = await api.me();
+    final data = (json['data'] as Map?)?.cast<String, dynamic>() ?? json;
+    return AppUser.fromJson(data);
+  }
+
+  Future<AppUser?> restoreSession() async {
+    final at = await tokenStorage.getAccess();
+    if (at == null || at.isEmpty) return null;
+
+    try {
+      return await me();
+    } on DioException catch (e) {
+      // access 만료면 refresh 후 재시도
+      if (e.response?.statusCode == 401) {
+        final rt = await tokenStorage.getRefresh();
+        if (rt == null || rt.isEmpty) return null;
+
+        final refreshed = await api.refresh(rt);
+        final rdata =
+            (refreshed['data'] as Map?)?.cast<String, dynamic>() ?? refreshed;
+
+        final newAccess = rdata['accessToken'] as String?;
+        final newRefresh = (rdata['refreshToken'] as String?) ?? rt;
+
+        if (newAccess == null || newAccess.isEmpty) return null;
+
+        await tokenStorage.save(
+          accessToken: newAccess,
+          refreshToken: newRefresh,
+        );
+        return await me();
+      }
+      rethrow;
+    }
   }
 }

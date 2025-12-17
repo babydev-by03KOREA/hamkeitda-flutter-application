@@ -1,9 +1,17 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hamkeitda_flutter/features/admin/application/admin_controller.dart';
+import 'package:hamkeitda_flutter/features/admin/application/bbs_controller.dart';
+import 'package:hamkeitda_flutter/features/admin/application/documents_controller.dart';
+import 'package:hamkeitda_flutter/features/admin/application/facility_images_controller.dart';
+import 'package:hamkeitda_flutter/features/admin/application/fees_controller.dart';
+import 'package:hamkeitda_flutter/features/admin/application/programs_controller.dart';
 import 'package:hamkeitda_flutter/features/admin/domain/admin_basic_state.dart';
 import 'package:hamkeitda_flutter/features/auth/application/auth_provider.dart';
 import 'package:hamkeitda_flutter/features/auth/domain/user.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../auth/application/auth_controller.dart';
 
@@ -35,6 +43,10 @@ class AdminDashboardScreen extends ConsumerWidget {
       (prev, next) {
         if (prev != next && next != null) {
           ref.invalidate(adminBasicProvider);
+          ref.invalidate(documentsProvider);
+          ref.invalidate(programsProvider);
+          ref.invalidate(feesProvider);
+          ref.invalidate(bbsProvider);
         }
       },
     );
@@ -97,30 +109,6 @@ class AdminDashboardScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('오류: $e')),
         data: (s) => _AdminBody(state: s),
-      ),
-      // [추가] 스크린샷 하단의 '변경사항 저장' 버튼
-      bottomNavigationBar: BottomAppBar(
-        color: Colors.white, // 배경색을 흰색으로 설정
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: FilledButton(
-            onPressed: () {
-              // TODO: 모든 변경사항 저장 로직
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.black,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 48),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text(
-              '변경사항 저장',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -237,52 +225,6 @@ class _AdminBodyState extends ConsumerState<_AdminBody>
                 },
               ),
               const SizedBox(height: 12),
-              // [수정] 스크린샷과 동일한 이미지 첨부 UI
-              const Text(
-                '시설 이미지',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.black54,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      width: 100, // 스크린샷 비율에 맞게 크기 조절
-                      height: 100,
-                      color: const Color(0xFFEFEFEF),
-                      child: _s.imageUrl == null
-                          ? const Icon(
-                              Icons.image_not_supported_outlined,
-                              size: 40,
-                              color: Colors.black26,
-                            )
-                          : Image.network(_s.imageUrl!, fit: BoxFit.cover),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // [수정] 스크린샷과 동일한 '이미지 추가' 버튼 스타일
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      // TODO: 이미지 픽커 붙이기
-                    },
-                    icon: const Icon(Icons.upload_outlined, size: 20),
-                    label: const Text('이미지 추가'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.black,
-                      side: const BorderSide(color: Colors.black26),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerRight,
                 child: FilledButton(
@@ -292,6 +234,131 @@ class _AdminBodyState extends ConsumerState<_AdminBody>
                 ),
               ),
             ],
+          ),
+        ),
+        _Card(
+          title: '시설 이미지 업로드',
+          subtitle: '이미지로 시설을 보여주세요 (여러 장 업로드 가능)',
+          child: Consumer(
+            builder: (context, ref, _) {
+              final imagesAsync = ref.watch(facilityImagesProvider);
+
+              Future<void> pickAndUpload() async {
+                final picker = ImagePicker();
+
+                // 여러장 선택
+                final files = await picker.pickMultiImage(imageQuality: 85);
+                if (files.isEmpty) return;
+
+                final dartFiles = files.map((x) => File(x.path)).toList();
+
+                try {
+                  await ref
+                      .read(facilityImagesProvider.notifier)
+                      .uploadMany(
+                        files: dartFiles,
+                        makeFirstPrimary: true, // 첫 장은 대표로 올리고 싶으면 true
+                      );
+
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('이미지 업로드 완료!')));
+                } catch (e) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('업로드 실패: $e')));
+                }
+              }
+
+              return Column(
+                children: [
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: imagesAsync.when(
+                          loading: () => const SizedBox(
+                            height: 100,
+                            child: Center(child: CircularProgressIndicator()),
+                          ),
+                          error: (e, _) => SizedBox(
+                            height: 100,
+                            child: Center(child: Text('오류: $e')),
+                          ),
+                          data: (imgs) {
+                            final urls = imgs.map((e) => e.url).toList();
+
+                            if (urls.isEmpty) {
+                              return Row(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Container(
+                                      width: 100,
+                                      height: 100,
+                                      color: const Color(0xFFEFEFEF),
+                                      child: const Icon(
+                                        Icons.image_not_supported_outlined,
+                                        size: 40,
+                                        color: Colors.black26,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  const Expanded(
+                                    child: Text(
+                                      '아직 업로드된 이미지가 없어요',
+                                      style: TextStyle(color: Colors.black54),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }
+
+                            return SizedBox(
+                              height: 100,
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: urls.length,
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(width: 10),
+                                itemBuilder: (context, i) {
+                                  return ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Container(
+                                      width: 100,
+                                      height: 100,
+                                      color: const Color(0xFFEFEFEF),
+                                      child: Image.network(
+                                        urls[i],
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      OutlinedButton.icon(
+                        onPressed: pickAndUpload,
+                        icon: const Icon(Icons.upload_outlined, size: 20),
+                        label: const Text('이미지 추가'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.black,
+                          side: const BorderSide(color: Colors.black26),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
           ),
         ),
         const SizedBox(height: 12),
@@ -524,11 +591,28 @@ class _TextField extends StatelessWidget {
 }
 
 // [추가] 탭 1: 필요 서류 위젯
-class _TabRequiredDocs extends StatelessWidget {
+class _TabRequiredDocs extends ConsumerStatefulWidget {
   const _TabRequiredDocs();
 
   @override
+  ConsumerState<_TabRequiredDocs> createState() => _TabRequiredDocsState();
+}
+
+class _TabRequiredDocsState extends ConsumerState<_TabRequiredDocs> {
+  final _titleCtrl = TextEditingController();
+  final _howToCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _howToCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final docsAsync = ref.watch(documentsProvider);
+
     return _Card(
       title: '필요 서류 관리',
       subtitle: '시설 이용 시 필요한 서류와 안내사항을 관리하세요',
@@ -536,30 +620,130 @@ class _TabRequiredDocs extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(child: _TabInputTextField(hint: '서류명을 입력하세요')),
+              Expanded(
+                child: _TabInputTextField(
+                  hint: '서류명을 입력하세요',
+                  controller: _titleCtrl,
+                ),
+              ),
               const SizedBox(width: 8),
-              const Expanded(child: _TabInputTextField(hint: '획득 방법 (선택사항)')),
+              Expanded(
+                child: _TabInputTextField(
+                  hint: '획득 방법 (선택사항)',
+                  controller: _howToCtrl,
+                ),
+              ),
               const SizedBox(width: 8),
-              _AddButton(onPressed: () {}),
+              _AddButton(
+                onPressed: () async {
+                  final title = _titleCtrl.text.trim();
+                  final howTo = _howToCtrl.text.trim();
+
+                  if (title.isEmpty) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(const SnackBar(content: Text('서류명을 입력하세요')));
+                    return;
+                  }
+
+                  try {
+                    await ref
+                        .read(documentsProvider.notifier)
+                        .add(
+                          documentName: title,
+                          howToGet: howTo.isEmpty ? null : howTo,
+                        );
+
+                    _titleCtrl.clear();
+                    _howToCtrl.clear();
+                  } catch (e) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('추가 실패: $e')));
+                  }
+                },
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          // TODO: 이 부분은 향후 상태관리(State)를 통해 동적으로 리스트를 만드셔야 합니다.
-          _ListItem(text: '운영허가증', onDelete: () {}),
-          const SizedBox(height: 8),
-          _ListItem(text: '관련 자격증', onDelete: () {}),
+
+          docsAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: CircularProgressIndicator(),
+            ),
+            error: (e, _) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text('오류: $e'),
+            ),
+            data: (docs) {
+              if (docs.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Text(
+                    '등록된 서류가 없습니다.',
+                    style: TextStyle(color: Colors.black54),
+                  ),
+                );
+              }
+
+              return Column(
+                children: docs.map((d) {
+                  final text = d.howTo == null || d.howTo!.isEmpty
+                      ? d.title
+                      : '${d.title} · ${d.howTo}';
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _ListItem(
+                      text: text,
+                      onDelete: () async {
+                        if (d.id <= 0) return;
+                        try {
+                          await ref
+                              .read(documentsProvider.notifier)
+                              .remove(d.id);
+                        } catch (e) {
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text('삭제 실패: $e')));
+                        }
+                      },
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
         ],
       ),
     );
   }
 }
 
-// [추가] 탭 2: 프로그램 위젯
-class _TabPrograms extends StatelessWidget {
+//  탭 2: 프로그램 위젯
+class _TabPrograms extends ConsumerStatefulWidget {
   const _TabPrograms();
 
   @override
+  ConsumerState<_TabPrograms> createState() => _TabProgramsState();
+}
+
+class _TabProgramsState extends ConsumerState<_TabPrograms> {
+  final _nameCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final programsAsync = ref.watch(programsProvider);
+
     return _Card(
       title: '프로그램 관리',
       subtitle: '시설에서 제공하는 프로그램과 서비스를 관리하세요',
@@ -567,18 +751,103 @@ class _TabPrograms extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(child: _TabInputTextField(hint: '프로그램명을 입력하세요')),
+              Expanded(
+                child: _TabInputTextField(
+                  hint: '프로그램명을 입력하세요',
+                  controller: _nameCtrl,
+                ),
+              ),
               const SizedBox(width: 8),
-              const Expanded(child: _TabInputTextField(hint: '프로그램 설명 (선택.)')),
+              Expanded(
+                child: _TabInputTextField(
+                  hint: '프로그램 설명 (선택.)',
+                  controller: _descCtrl,
+                ),
+              ),
               const SizedBox(width: 8),
-              _AddButton(onPressed: () {}),
+              _AddButton(
+                onPressed: () async {
+                  final name = _nameCtrl.text.trim();
+                  final desc = _descCtrl.text.trim();
+
+                  if (name.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('프로그램명을 입력하세요')),
+                    );
+                    return;
+                  }
+
+                  try {
+                    await ref
+                        .read(programsProvider.notifier)
+                        .add(
+                          name: name,
+                          description: desc.isEmpty ? null : desc,
+                        );
+
+                    _nameCtrl.clear();
+                    _descCtrl.clear();
+                  } catch (e) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('추가 실패: $e')));
+                  }
+                },
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          // TODO: 이 부분은 향후 상태관리(State)를 통해 동적으로 리스트를 만드셔야 합니다.
-          _ListItem(text: '상담 서비스', onDelete: () {}),
-          const SizedBox(height: 8),
-          _ListItem(text: '교육 프로그램', onDelete: () {}),
+
+          programsAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: CircularProgressIndicator(),
+            ),
+            error: (e, _) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text('오류: $e'),
+            ),
+            data: (programs) {
+              debugPrint('🟦 UI programs length = ${programs.length}');
+              debugPrint('🟦 UI programs = $programs');
+              if (programs.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Text(
+                    '등록된 프로그램이 없습니다.',
+                    style: TextStyle(color: Colors.black54),
+                  ),
+                );
+              }
+
+              return Column(
+                children: programs.map((p) {
+                  final text = (p.description == null || p.description!.isEmpty)
+                      ? p.name
+                      : '${p.name} · ${p.description}';
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _ListItem(
+                      text: text,
+                      onDelete: () async {
+                        if (p.id <= 0) return;
+                        try {
+                          await ref
+                              .read(programsProvider.notifier)
+                              .remove(p.id);
+                        } catch (e) {
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text('삭제 실패: $e')));
+                        }
+                      },
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -586,11 +855,28 @@ class _TabPrograms extends StatelessWidget {
 }
 
 // [추가] 탭 3: 이용료 위젯
-class _TabFees extends StatelessWidget {
+class _TabFees extends ConsumerStatefulWidget {
   const _TabFees();
 
   @override
+  ConsumerState<_TabFees> createState() => _TabFeesState();
+}
+
+class _TabFeesState extends ConsumerState<_TabFees> {
+  final _titleCtrl = TextEditingController();
+  final _feeTextCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _feeTextCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final feesAsync = ref.watch(feesProvider);
+
     return _Card(
       title: '이용료 관리',
       subtitle: '시설 이용료와 서비스별 요금을 관리하세요',
@@ -598,18 +884,90 @@ class _TabFees extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Expanded(
-                child: _TabInputTextField(hint: '새 이용료 정보를 입력하세요'),
+              Expanded(
+                child: _TabInputTextField(
+                  hint: '항목명 (예: 기본 상담)',
+                  controller: _titleCtrl,
+                ),
               ),
               const SizedBox(width: 8),
-              _AddButton(onPressed: () {}),
+              Expanded(
+                child: _TabInputTextField(
+                  hint: '이용료 (예: 무료/문의/10,000원)',
+                  controller: _feeTextCtrl,
+                ),
+              ),
+              const SizedBox(width: 8),
+              _AddButton(
+                onPressed: () async {
+                  final title = _titleCtrl.text.trim();
+                  final feeText = _feeTextCtrl.text.trim();
+
+                  if (title.isEmpty || feeText.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('항목명/이용료를 입력하세요')),
+                    );
+                    return;
+                  }
+
+                  try {
+                    await ref
+                        .read(feesProvider.notifier)
+                        .add(title: title, feeText: feeText);
+                    _titleCtrl.clear();
+                    _feeTextCtrl.clear();
+                  } catch (e) {
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('추가 실패: $e')));
+                  }
+                },
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          // TODO: 이 부분은 향후 상태관리(State)를 통해 동적으로 리스트를 만드셔야 합니다.
-          _ListItem(text: '기본 상담: 무료', onDelete: () {}),
-          const SizedBox(height: 8),
-          _ListItem(text: '전문 서비스: 별도 협의', onDelete: () {}),
+          feesAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: CircularProgressIndicator(),
+            ),
+            error: (e, _) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text('오류: $e'),
+            ),
+            data: (fees) {
+              if (fees.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Text(
+                    '등록된 이용료가 없습니다.',
+                    style: TextStyle(color: Colors.black54),
+                  ),
+                );
+              }
+
+              return Column(
+                children: fees.map((f) {
+                  final text = '${f.title} · ${f.feeText}';
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _ListItem(
+                      text: text,
+                      onDelete: () async {
+                        try {
+                          await ref.read(feesProvider.notifier).remove(f.id);
+                        } catch (e) {
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text('삭제 실패: $e')));
+                        }
+                      },
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -617,37 +975,65 @@ class _TabFees extends StatelessWidget {
 }
 
 // [추가] 탭 4: 게시물 위젯
-class _TabPosts extends StatelessWidget {
+class _TabPosts extends ConsumerStatefulWidget {
   const _TabPosts();
 
   @override
+  ConsumerState<_TabPosts> createState() => _TabPostsState();
+}
+
+class _TabPostsState extends ConsumerState<_TabPosts> {
+  final _titleCtrl = TextEditingController();
+  final _contentCtrl = TextEditingController();
+
+  File? _imageFile;
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _contentCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final xfile = await picker.pickImage(source: ImageSource.gallery);
+    if (xfile != null) {
+      setState(() => _imageFile = File(xfile.path));
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final bbsAsync = ref.watch(bbsProvider);
+
     return _Card(
       title: '게시물 관리',
       subtitle: '시설 소식과 공지사항을 게시하여 이용자들에게 정보를 제공하세요',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const _TabInputTextField(hint: '게시물 제목을 입력하세요'),
+          /// 제목
+          _TabInputTextField(hint: '게시물 제목을 입력하세요', controller: _titleCtrl),
           const SizedBox(height: 10),
-          const _TabInputTextField(
+
+          /// 내용
+          _TabInputTextField(
             hint: '게시물 내용을 입력하세요',
-            maxLines: 5, // 스크린샷과 비슷하게 높이 조절
+            maxLines: 5,
+            controller: _contentCtrl,
           ),
           const SizedBox(height: 12),
-          // "이미지 첨부" 버튼
+
+          /// 이미지 선택
           OutlinedButton.icon(
-            onPressed: () {
-              // TODO: 이미지 픽커
-            },
+            onPressed: _pickImage,
             icon: const Icon(Icons.upload_outlined, size: 20),
-            label: const Text('이미지 첨부'),
+            label: Text(_imageFile == null ? '이미지 첨부' : '이미지 선택됨'),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.black,
               backgroundColor: const Color(0xFFF4F4F6),
-              // 스크린샷의 옅은 회색
               side: BorderSide.none,
-              // 테두리 없음
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -655,15 +1041,42 @@ class _TabPosts extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          // "게시물 등록" 버튼
+
+          /// 게시물 등록 버튼
           FilledButton.icon(
-            onPressed: () {
-              // TODO: 게시물 등록 로직
+            onPressed: () async {
+              final title = _titleCtrl.text.trim();
+              final content = _contentCtrl.text.trim();
+
+              if (title.isEmpty || content.isEmpty) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('제목과 내용을 입력하세요')));
+                return;
+              }
+
+              try {
+                await ref
+                    .read(bbsProvider.notifier)
+                    .create(
+                      title: title,
+                      content: content,
+                      imageFile: _imageFile,
+                    );
+
+                _titleCtrl.clear();
+                _contentCtrl.clear();
+                setState(() => _imageFile = null);
+              } catch (e) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('등록 실패: $e')));
+              }
             },
             icon: const Icon(Icons.add, color: Colors.white, size: 20),
             label: const Text('게시물 등록'),
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.black, // 스크린샷의 검은색
+              backgroundColor: Colors.black,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 12),
               shape: RoundedRectangleBorder(
@@ -671,23 +1084,52 @@ class _TabPosts extends StatelessWidget {
               ),
             ),
           ),
+
           const SizedBox(height: 24),
           const Text(
             '등록된 게시물',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 16),
-          // TODO: 향후 게시물 목록이 없을 때만 표시
-          const Center(
-            child: Padding(
+
+          /// 게시물 목록
+          bbsAsync.when(
+            loading: () => const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
-              child: Text(
-                '등록된 게시물이 없습니다.',
-                style: TextStyle(color: Colors.black54),
-              ),
+              child: Center(child: CircularProgressIndicator()),
             ),
+            error: (e, _) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text('오류: $e'),
+            ),
+            data: (page) {
+              final posts = page.items;
+
+              if (posts.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text(
+                      '등록된 게시물이 없습니다.',
+                      style: TextStyle(color: Colors.black54),
+                    ),
+                  ),
+                );
+              }
+
+              return Column(
+                children: posts.map((p) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _ListItem(
+                      text: p.title,
+                      onDelete: () {}, // 삭제 요구사항 없음
+                    ),
+                  );
+                }).toList(),
+              );
+            },
           ),
-          // TODO: 게시물 목록이 있을 경우 _ListItem과 비슷한 위젯으로 렌더링
         ],
       ),
     );
